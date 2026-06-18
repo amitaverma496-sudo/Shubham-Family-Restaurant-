@@ -1,0 +1,6 @@
+{
+  "name": "Shubham Family Restaurant & Hotel",
+  "description": "An ultra-premium modern luxury restaurant and hotel website featuring Apple-inspired aesthetics, interactive menus, customizable bookings, and admin controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

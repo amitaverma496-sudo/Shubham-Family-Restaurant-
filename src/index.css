@@ -1,0 +1,192 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: 'Playfair Display', serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Custom Clean Theme Colors mapped to spec sheet */
+  --color-gold: #3B82F6;          /* Accent: #3B82F6 */
+  --color-soft-gold: #2563EB;     /* Accent Hover: #2563EB */
+  --color-lux-black: #0B0B0C;     /* Background: #0B0B0C */
+  --color-lux-secondary: #111214;  /* Surface: #111214 */
+  --color-lux-card: #18191C;       /* Card: #18191C */
+  --color-lux-border: #27272A;     /* Border: #27272A */
+  --color-success: #22C55E;        /* Success: #22C55E */
+
+  /* Overriding Tailwind's native colors for total consistency */
+  --color-emerald-500: #22C55E;
+  --color-emerald-400: #22C55E;
+  --color-emerald-600: #16A34A;
+  
+  --color-gray-400: #A1A1AA;       /* Secondary Text: #A1A1AA */
+  --color-zinc-400: #A1A1AA;
+  --color-neutral-400: #A1A1AA;
+  --color-slate-400: #A1A1AA;
+  
+  --color-gray-800: #27272A;       /* Border: #27272A */
+  --color-zinc-800: #27272A;
+  --color-neutral-800: #27272A;
+  --color-slate-800: #27272A;
+}
+
+/* Custom gorgeous animations & custom scrollbars */
+@layer base {
+  body {
+    background-color: #0B0B0C;
+    color: #FFFFFF;
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+  }
+
+  /* Custom thin scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0B0B0C;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #3B82F6;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2563EB;
+  }
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(24, 25, 28, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.glass-intense {
+  background: rgba(17, 18, 20, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+}
+
+.gold-glow {
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.gold-box-glow {
+  box-shadow: 0 0 25px rgba(59, 130, 246, 0.15);
+}
+
+/* Refined, high-end metallic text shading (Easy to use & read, professional 3D) */
+.text-3d-gold {
+  color: #3B82F6;
+  background: linear-gradient(135deg, #E0F2FE 0%, #3B82F6 55%, #1D4ED8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.85)) drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.5));
+  font-weight: 800 !important;
+}
+
+.text-3d-white {
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 60%, #94A3B8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.7)) drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.4));
+  font-weight: 800 !important;
+}
+
+.text-3d-soft {
+  color: #F5E6CA;
+  background: linear-gradient(135deg, #FFFFFF 0%, #F5E6CA 50%, #D4C3A3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.6));
+  font-weight: 700 !important;
+}
+
+.text-3d-silver {
+  color: #E2E8F0;
+  background: linear-gradient(135deg, #FFFFFF 0%, #CBD5E1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+/* Animate ambient streak paths */
+@keyframes streak {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.animate-streak {
+  animation: streak 12s linear infinite;
+}
+
+/* Beautiful live organic camera motion presets for images */
+@keyframes live-kenburns {
+  0% {
+    transform: scale(1.02) translate(0px, 0px) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.08) translate(6px, -4px) rotate(0.4deg);
+  }
+  50% {
+    transform: scale(1.03) translate(-3px, 5px) rotate(-0.3deg);
+  }
+  75% {
+    transform: scale(1.09) translate(4px, 6px) rotate(0.4deg);
+  }
+  100% {
+    transform: scale(1.02) translate(0px, 0px) rotate(0deg);
+  }
+}
+
+.animate-live-kenburns {
+  animation: live-kenburns 32s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes live-pan-subtle {
+  0% {
+    transform: scale(1.05) translate(-6px, -3px);
+  }
+  50% {
+    transform: scale(1.10) translate(6px, 3px);
+  }
+  100% {
+    transform: scale(1.05) translate(-6px, -3px);
+  }
+}
+
+.animate-live-pan {
+  animation: live-pan-subtle 24s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes live-pulse-zoom {
+  0% {
+    transform: scale(1.0);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1.0);
+  }
+}
+
+.animate-live-zoom {
+  animation: live-pulse-zoom 16s ease-in-out infinite;
+  will-change: transform;
+}
+
