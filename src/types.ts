@@ -21,6 +21,8 @@ export interface Booking {
   status: 'Pending' | 'Confirmed' | 'Cancelled';
   specialRequest?: string;
   createdAt: string;
+  bookingType?: 'table' | 'preorder';
+  preorderDishes?: string;
 }
 
 export interface GalleryItem {

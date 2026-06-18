@@ -10,6 +10,10 @@ import { motion, AnimatePresence } from 'motion/react';
 // Import Types
 import { MenuItem, Booking, GalleryItem, Inquiry } from './types';
 
+// Import Firestore database sync
+import { collection, query, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from './firebase';
+
 // Import Seed Data
 import { 
   INITIAL_MENU_ITEMS, INITIAL_REVIEWS, INITIAL_GALLERY_ITEMS, 
@@ -73,6 +77,39 @@ export default function App() {
     localStorage.setItem('shubham_bookings', JSON.stringify(bookings));
   }, [bookings]);
 
+  // Sync bookings in real-time from Firestore
+  useEffect(() => {
+    const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetched: Booking[] = [];
+      snapshot.forEach((d) => {
+        fetched.push({ id: d.id, ...d.data() } as Booking);
+      });
+      
+      if (snapshot.empty && fetched.length === 0) {
+        // First-time seed of bookings into Firestore so the client context has records
+        const local = localStorage.getItem('shubham_bookings');
+        const initial = local ? JSON.parse(local) : INITIAL_BOOKINGS;
+        initial.forEach(async (b: Booking) => {
+          try {
+            await setDoc(doc(db, 'bookings', b.id), b);
+          } catch (err) {
+            try {
+              handleFirestoreError(err, OperationType.WRITE, `bookings/${b.id}`);
+            } catch (handledErr) {
+              console.error("Firestore initialization seed error:", handledErr);
+            }
+          }
+        });
+      } else {
+        setBookings(fetched);
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'bookings');
+    });
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('shubham_inquiries', JSON.stringify(inquiries));
   }, [inquiries]);
@@ -130,19 +167,24 @@ export default function App() {
   };
 
   // --- ACTIONS ---
-  const handleAddBooking = (newBooking: Omit<Booking, 'id' | 'createdAt' | 'status'>) => {
+  const handleAddBooking = async (newBooking: Omit<Booking, 'id' | 'createdAt' | 'status'>) => {
     const created: Booking = {
       id: 'b-' + Date.now(),
       ...newBooking,
       status: 'Pending',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      bookingType: 'table'
     };
-    setBookings(prev => [created, ...prev]);
+    try {
+      await setDoc(doc(db, 'bookings', created.id), created);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `bookings/${created.id}`);
+    }
     // Clear selection so cart notification resets
     setSelectedDishesForBooking([]);
   };
 
-  const handlePreOrderFormSubmit = (e: React.FormEvent) => {
+  const handlePreOrderFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPreOrderValidationWarning(null);
 
@@ -177,10 +219,17 @@ export default function App() {
       time: preOrderForm.time,
       specialRequest: preOrderForm.specialRequest,
       status: 'Pending',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      bookingType: 'preorder',
+      preorderDishes: selectedDishesForBooking.map(item => `${item.name} (x${item.quantity})`).join(', ')
     };
 
-    setBookings(prev => [created, ...prev]);
+    try {
+      await setDoc(doc(db, 'bookings', created.id), created);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `bookings/${created.id}`);
+    }
+    
     setPreOrderTicket({
       ticketNumber,
       name: preOrderForm.name,

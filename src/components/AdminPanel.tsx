@@ -2,10 +2,12 @@ import React, { useState, useRef } from 'react';
 import { 
   Users, Calendar, NotebookTabs, Image, MailCheck, Trash2, CheckCircle2, 
   XCircle, Filter, Plus, Compass, Sparkles, Check, KeySquare, ShieldCheck,
-  Search, Edit, X, MessageSquare
+  Search, Edit, X, MessageSquare, Utensils
 } from 'lucide-react';
 import { Booking, MenuItem, GalleryItem, Inquiry, MenuCategory } from '../types';
 import { motion } from 'motion/react';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 
 interface AdminPanelProps {
   bookings: Booking[];
@@ -18,7 +20,7 @@ interface AdminPanelProps {
   setInquiries: React.Dispatch<React.SetStateAction<Inquiry[]>>;
 }
 
-type TabType = 'bookings' | 'menu' | 'gallery' | 'inquiries';
+type TabType = 'table_bookings' | 'preorders' | 'menu' | 'gallery' | 'inquiries';
 
 export default function AdminPanel({
   bookings, setBookings,
@@ -29,7 +31,7 @@ export default function AdminPanel({
   const [password, setPassword] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [unlockError, setUnlockError] = useState('');
-  const [activeTab, setActiveTab] = useState<TabType>('bookings');
+  const [activeTab, setActiveTab] = useState<TabType>('table_bookings');
   
   const menuFormRef = useRef<HTMLDivElement>(null);
   
@@ -47,6 +49,7 @@ export default function AdminPanel({
 
   // Filter state for bookings
   const [bookingFilter, setBookingFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Cancelled'>('All');
+  const [preorderFilter, setPreorderFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Cancelled'>('All');
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,8 +62,18 @@ export default function AdminPanel({
   };
 
   // Booking actions
-  const updateBookingStatus = (id: string, newStatus: 'Confirmed' | 'Cancelled') => {
+  const updateBookingStatus = async (id: string, newStatus: 'Confirmed' | 'Cancelled') => {
     const booking = bookings.find(bk => bk.id === id);
+    
+    // Also write to Firestore in real-time
+    if (booking) {
+      try {
+        await setDoc(doc(db, 'bookings', id), { ...booking, status: newStatus });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `bookings/${id}`);
+      }
+    }
+
     setBookings(prev => prev.map(bk => bk.id === id ? { ...bk, status: newStatus } : bk));
 
     if (booking && newStatus === 'Confirmed') {
@@ -82,7 +95,12 @@ export default function AdminPanel({
     }
   };
 
-  const deleteBooking = (id: string) => {
+  const deleteBooking = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'bookings', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `bookings/${id}`);
+    }
     setBookings(prev => prev.filter(bk => bk.id !== id));
   };
 
@@ -190,9 +208,17 @@ export default function AdminPanel({
   const totalBookings = bookings.length;
   const confirmedBookings = bookings.filter(b => b.status === 'Confirmed').length;
 
-  const filteredBookings = bookings.filter(bk => {
+  const tableBookings = bookings.filter(b => b.bookingType === 'table' || !b.bookingType);
+  const foodPreorders = bookings.filter(b => b.bookingType === 'preorder');
+
+  const filteredTableBookings = tableBookings.filter(bk => {
     if (bookingFilter === 'All') return true;
     return bk.status === bookingFilter;
+  });
+
+  const filteredFoodPreorders = foodPreorders.filter(bk => {
+    if (preorderFilter === 'All') return true;
+    return bk.status === preorderFilter;
   });
 
   // Locked gate view
@@ -272,13 +298,23 @@ export default function AdminPanel({
       {/* Admin Tab Selectors */}
       <div className="flex overflow-x-auto gap-2 border-b border-white/5 pb-4 mb-8">
         <button
-          onClick={() => setActiveTab('bookings')}
+          onClick={() => setActiveTab('table_bookings')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-300 whitespace-nowrap ${
-            activeTab === 'bookings' ? 'bg-gold text-black' : 'bg-white/5 hover:bg-white/10 text-white/80'
+            activeTab === 'table_bookings' ? 'bg-gold text-black' : 'bg-white/5 hover:bg-white/10 text-white/80'
           }`}
         >
           <Calendar className="w-3.5 h-3.5" />
-          Bookings ({totalBookings})
+          Table Bookings ({tableBookings.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('preorders')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-300 whitespace-nowrap ${
+            activeTab === 'preorders' ? 'bg-gold text-black' : 'bg-white/5 hover:bg-white/10 text-white/80'
+          }`}
+        >
+          <Utensils className="w-3.5 h-3.5" />
+          Gastronomy Pre-Orders ({foodPreorders.length})
         </button>
 
         <button
@@ -315,12 +351,12 @@ export default function AdminPanel({
       {/* Tab Panels */}
       <div>
 
-        {/* 1. BOOKINGS LIST PANEL */}
-        {activeTab === 'bookings' && (
+        {/* 1. TABLE BOOKINGS LIST PANEL */}
+        {activeTab === 'table_bookings' && (
           <div className="space-y-6">
 
             <div className="flex items-center justify-between flex-wrap gap-4">
-              <h2 className="font-serif text-lg text-gold uppercase tracking-wider">Guest Reservations</h2>
+              <h2 className="font-serif text-lg text-gold uppercase tracking-wider">Restaurant Table Bookings</h2>
               <div className="flex items-center gap-2">
                 <Filter className="w-3.5 h-3.5 text-white/45" />
                 <select
@@ -328,25 +364,25 @@ export default function AdminPanel({
                   onChange={(e: any) => setBookingFilter(e.target.value)}
                   className="bg-lux-secondary text-white/90 border border-white/10 px-3 py-1.5 rounded-lg text-xs tracking-wider outline-none cursor-pointer"
                 >
-                  <option value="All">All Bookings</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Cancelled">Cancelled</option>
+                  <option value="All">All Statuses</option>
+                  <option value="Pending">Pending Only</option>
+                  <option value="Confirmed">Confirmed Only</option>
+                  <option value="Cancelled">Cancelled Only</option>
                 </select>
               </div>
             </div>
 
-            {filteredBookings.length === 0 ? (
+            {filteredTableBookings.length === 0 ? (
               <div className="glass text-center py-12 rounded-2xl border border-white/8">
                 <Calendar className="w-8 h-8 text-white/30 mx-auto mb-3" />
-                <p className="text-sm text-white/40 tracking-wider uppercase font-mono">No reservations matched this filter</p>
+                <p className="text-sm text-white/40 tracking-wider uppercase font-mono">No table bookings matched this filter</p>
               </div>
             ) : (
               <div className="space-y-4">
                 
-                {/* Mobile View: High-contrast, easy-to-tap touch cards */}
+                {/* Mobile View */}
                 <div className="block md:hidden space-y-4">
-                  {filteredBookings.map(bk => (
+                  {filteredTableBookings.map(bk => (
                     <div key={bk.id} className="glass p-4 rounded-2xl border border-white/10 space-y-3.5 relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-24 h-24 bg-[radial-gradient(ellipse_at_top_right,rgba(212,175,55,0.05),transparent_70%)] pointer-events-none" />
                       
@@ -366,7 +402,7 @@ export default function AdminPanel({
 
                       {bk.specialRequest && (
                         <div className="bg-black/40 border border-white/5 rounded-xl p-2.5">
-                          <span className="text-[8px] uppercase tracking-widest text-gold font-bold block mb-0.5">Special Dietary / Suite Req:</span>
+                          <span className="text-[8px] uppercase tracking-widest text-gold font-bold block mb-0.5">Special Request:</span>
                           <p className="text-[10px] text-white/80 tracking-wide font-sans italic leading-relaxed">
                             "{bk.specialRequest}"
                           </p>
@@ -385,7 +421,6 @@ export default function AdminPanel({
                       </div>
 
                       <div className="flex items-center justify-between border-t border-white/5 pt-3 pr-1 gap-2">
-                        {/* Inline actions with touch targets of at least 44px for easy mobile usage */}
                         <div className="flex gap-2">
                           {bk.status !== 'Confirmed' && (
                             <button
@@ -400,12 +435,11 @@ export default function AdminPanel({
                               onClick={() => {
                                 const cleanedPhone = bk.phone.replace(/\D/g, '');
                                 const validPhone = cleanedPhone.length === 10 ? '91' + cleanedPhone : cleanedPhone;
-                                const message = `*Pre-Order Confirmed! 🌟*\n\nHello *${bk.name}*,\n\nWe are delighted to inform you that your dining pre-order at *Shubham Family Restaurant & Hotel* is now *CONFIRMED*!\n\n*Reservation Details:*\n📅 *Date:* ${bk.date}\n⏰ *Time:* ${bk.time}\n👥 *Guests:* ${bk.guests} Guests\n\nOur team is looking forward to hosting you for an exquisite dining experience. If you need any adjustments, please feel free to reach out to us.\n\nWarm regards,\n*Shubham Family Restaurant & Hotel Team*`;
+                                const message = `*Table Reservation Confirmed! 🌟*\n\nHello *${bk.name}*,\n\nWe are delighted to inform you that your table reservation at *Shubham Family Restaurant & Hotel* is now *CONFIRMED*!\n\n*Reservation Details:*\n📅 *Date:* ${bk.date}\n⏰ *Time:* ${bk.time}\n👥 *Guests:* ${bk.guests} Guests\n\nOur team is looking forward to hosting you for an exquisite dining experience.\n\nWarm regards,\n*Shubham Family Restaurant & Hotel Team*`;
                                 const whatsappUrl = `https://wa.me/${validPhone}?text=${encodeURIComponent(message)}`;
                                 window.open(whatsappUrl, '_blank');
                               }}
                               className="px-3 py-2 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30 text-[9px] uppercase font-bold tracking-widest transition-all cursor-pointer active:scale-95 flex items-center gap-1.5"
-                              title="Send or Resend WhatsApp Confirmation"
                             >
                               <MessageSquare className="w-3.5 h-3.5" />
                               WhatsApp
@@ -434,12 +468,12 @@ export default function AdminPanel({
                   ))}
                 </div>
 
-                {/* Desktop View: Full Grid Table */}
+                {/* Desktop View */}
                 <div className="hidden md:block overflow-x-auto rounded-xl border border-white/10 bg-black/40">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-white/10 bg-white/5 text-white/60 tracking-wider uppercase">
-                        <th className="p-4">Guest</th>
+                        <th className="p-4">Customer</th>
                         <th className="p-4">Contact</th>
                         <th className="p-4 text-center">Guests Count</th>
                         <th className="p-4">Date & Time</th>
@@ -448,7 +482,7 @@ export default function AdminPanel({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {filteredBookings.map(bk => (
+                      {filteredTableBookings.map(bk => (
                         <tr key={bk.id} className="hover:bg-white/2 transition-colors">
                           <td className="p-4 font-serif font-extrabold text-white text-sm">
                             {bk.name}
@@ -482,12 +516,11 @@ export default function AdminPanel({
                                   onClick={() => {
                                     const cleanedPhone = bk.phone.replace(/\D/g, '');
                                     const validPhone = cleanedPhone.length === 10 ? '91' + cleanedPhone : cleanedPhone;
-                                    const message = `*Pre-Order Confirmed! 🌟*\n\nHello *${bk.name}*,\n\nWe are delighted to inform you that your dining pre-order at *Shubham Family Restaurant & Hotel* is now *CONFIRMED*!\n\n*Reservation Details:*\n📅 *Date:* ${bk.date}\n⏰ *Time:* ${bk.time}\n👥 *Guests:* ${bk.guests} Guests\n\nOur team is looking forward to hosting you for an exquisite dining experience. If you need any adjustments, please feel free to reach out to us.\n\nWarm regards,\n*Shubham Family Restaurant & Hotel Team*`;
+                                    const message = `*Table Reservation Confirmed! 🌟*\n\nHello *${bk.name}*,\n\nWe are delighted to inform you that your table reservation at *Shubham Family Restaurant & Hotel* is now *CONFIRMED*!\n\n*Reservation Details:*\n📅 *Date:* ${bk.date}\n⏰ *Time:* ${bk.time}\n👥 *Guests:* ${bk.guests} Guests\n\nOur team is looking forward to hosting you for an exquisite dining experience.\n\nWarm regards,\n*Shubham Family Restaurant & Hotel Team*`;
                                     const whatsappUrl = `https://wa.me/${validPhone}?text=${encodeURIComponent(message)}`;
                                     window.open(whatsappUrl, '_blank');
                                   }}
                                   className="p-1 px-2.5 rounded-md bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 text-[10px] uppercase font-bold transition-all cursor-pointer flex items-center gap-1"
-                                  title="Send or Resend WhatsApp Confirmation"
                                 >
                                   <MessageSquare className="w-3.5 h-3.5" />
                                   <span>WhatsApp</span>
@@ -497,7 +530,6 @@ export default function AdminPanel({
                                 <button
                                   onClick={() => updateBookingStatus(bk.id, 'Confirmed')}
                                   className="p-1 px-2.5 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-[10px] uppercase font-bold transition-all cursor-pointer"
-                                  title="Confirm Reservation"
                                 >
                                   Accept
                                 </button>
@@ -506,7 +538,6 @@ export default function AdminPanel({
                                 <button
                                   onClick={() => updateBookingStatus(bk.id, 'Cancelled')}
                                   className="p-1 px-2.5 rounded-md bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-[10px] uppercase font-bold transition-all cursor-pointer"
-                                  title="Cancel Reservation"
                                 >
                                   Decline
                                 </button>
@@ -514,7 +545,228 @@ export default function AdminPanel({
                               <button
                                 onClick={() => deleteBooking(bk.id)}
                                 className="p-1 rounded-md text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
-                                title="Delete Record"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 1.5 GASTROMONY PRE-ORDERS LIST PANEL */}
+        {activeTab === 'preorders' && (
+          <div className="space-y-6">
+
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <h2 className="font-serif text-lg text-gold uppercase tracking-wider">Gastronomy Food Pre-orders</h2>
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-white/45" />
+                <select
+                  value={preorderFilter}
+                  onChange={(e: any) => setPreorderFilter(e.target.value)}
+                  className="bg-lux-secondary text-white/90 border border-white/10 px-3 py-1.5 rounded-lg text-xs tracking-wider outline-none cursor-pointer"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Pending">Pending Only</option>
+                  <option value="Confirmed">Confirmed Only</option>
+                  <option value="Cancelled">Cancelled Only</option>
+                </select>
+              </div>
+            </div>
+
+            {filteredFoodPreorders.length === 0 ? (
+              <div className="glass text-center py-12 rounded-2xl border border-white/8">
+                <Utensils className="w-8 h-8 text-white/30 mx-auto mb-3" />
+                <p className="text-sm text-white/40 tracking-wider uppercase font-mono">No food pre-orders matched this filter</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                
+                {/* Mobile View */}
+                <div className="block md:hidden space-y-4">
+                  {filteredFoodPreorders.map(bk => (
+                    <div key={bk.id} className="glass p-4 rounded-2xl border border-white/10 space-y-3.5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-[radial-gradient(ellipse_at_top_right,rgba(212,175,55,0.05),transparent_70%)] pointer-events-none" />
+                      
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="space-y-0.5">
+                          <h4 className="font-serif font-extrabold text-[#F3F4F6] text-sm tracking-wider uppercase">{bk.name}</h4>
+                          <p className="font-mono text-[10px] text-white/50">{bk.phone}</p>
+                        </div>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[8.5px] font-bold tracking-widest uppercase shrink-0 ${
+                          bk.status === 'Confirmed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                          bk.status === 'Cancelled' ? 'bg-red-500/10 text-red-400 border border-red-500/25' :
+                          'bg-amber-500/15 text-amber-400 border border-amber-500/25 animate-pulse'
+                        }`}>
+                          {bk.status}
+                        </span>
+                      </div>
+
+                      <div className="bg-gold/10 border border-gold/20 rounded-xl p-3 space-y-1">
+                        <span className="text-[8px] uppercase tracking-widest text-gold font-black block">Pre-ordered Gastronomy:</span>
+                        <p className="text-xs font-semibold text-white/95 leading-relaxed font-mono">
+                          {bk.preorderDishes || 'Exquisite Cuisines (Custom preorder)'}
+                        </p>
+                      </div>
+
+                      {bk.specialRequest && (
+                        <div className="bg-black/40 border border-white/5 rounded-xl p-2.5">
+                          <span className="text-[8px] uppercase tracking-widest text-white/50 font-bold block mb-0.5">Customer Comment / Request:</span>
+                          <p className="text-[10px] text-white/80 tracking-wide font-sans italic leading-relaxed">
+                            "{bk.specialRequest}"
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2 text-[10px] font-mono border-t border-white/5 pt-2 text-white/70">
+                        <div className="flex flex-col">
+                          <span className="text-[7.5px] font-bold uppercase tracking-wider text-white/40 mb-0.5">Guests Count</span>
+                          <span className="font-sans font-extrabold text-gold">{bk.guests} Members</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[7.5px] font-bold uppercase tracking-wider text-white/40 mb-0.5">Scheduled Date</span>
+                          <span className="font-sans font-bold text-white/90">{bk.date} @ {bk.time}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-white/5 pt-3 pr-1 gap-2">
+                        <div className="flex gap-2">
+                          {bk.status !== 'Confirmed' && (
+                            <button
+                              onClick={() => updateBookingStatus(bk.id, 'Confirmed')}
+                              className="px-3.5 py-2.5 rounded-lg bg-emerald-500 text-black hover:bg-emerald-400 text-[10px] uppercase font-black tracking-widest transition-all cursor-pointer active:scale-95 shadow-md flex items-center justify-center"
+                            >
+                              Accept
+                            </button>
+                          )}
+                          {bk.status === 'Confirmed' && (
+                            <button
+                              onClick={() => {
+                                const cleanedPhone = bk.phone.replace(/\D/g, '');
+                                const validPhone = cleanedPhone.length === 10 ? '91' + cleanedPhone : cleanedPhone;
+                                const message = `*Gastronomy Pre-Order Confirmed! 🌟*\n\nHello *${bk.name}*,\n\nWe are delighted to inform you that your Lucknowi family food pre-order is now *CONFIRMED*!\n\n*Preordered Dishes:*\n🍽️ ${bk.preorderDishes || 'Exquisite Royal Cuisines'}\n\n*Reservation Slot:*\n📅 *Date:* ${bk.date}\n⏰ *Time:* ${bk.time}\n👥 *Guests:* ${bk.guests} Guests\n\nOur kitchen has started preparing details for your select menu. Looking forward to hosting you soon.\n\nWarm regards,\n*Shubham Family Restaurant & Hotel Team*`;
+                                const whatsappUrl = `https://wa.me/${validPhone}?text=${encodeURIComponent(message)}`;
+                                window.open(whatsappUrl, '_blank');
+                              }}
+                              className="px-3 py-2 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30 text-[9px] uppercase font-bold tracking-widest transition-all cursor-pointer active:scale-95 flex items-center gap-1.5"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              WhatsApp
+                            </button>
+                          )}
+                          {bk.status !== 'Cancelled' && (
+                            <button
+                              onClick={() => updateBookingStatus(bk.id, 'Cancelled')}
+                              className="px-3.5 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/20 text-[10px] uppercase font-bold tracking-widest transition-all cursor-pointer active:scale-95"
+                            >
+                              Decline
+                            </button>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => deleteBooking(bk.id)}
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop View */}
+                <div className="hidden md:block overflow-x-auto rounded-xl border border-white/10 bg-black/40">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-white/5 text-white/60 tracking-wider uppercase">
+                        <th className="p-4">Customer</th>
+                        <th className="p-4">Contact</th>
+                        <th className="p-4">Pre-ordered Gastronomy Dishes</th>
+                        <th className="p-4 text-center">Diners Count</th>
+                        <th className="p-4">Date & Slot</th>
+                        <th className="p-5 text-center">Status</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {filteredFoodPreorders.map(bk => (
+                        <tr key={bk.id} className="hover:bg-white/2 transition-colors">
+                          <td className="p-4 font-serif font-extrabold text-white text-sm">
+                            {bk.name}
+                            {bk.specialRequest && (
+                              <span className="block font-sans text-[10px] text-white/40 italic font-normal mt-1">
+                                Comment: "{bk.specialRequest}"
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 font-mono text-white/70">{bk.phone}</td>
+                          <td className="p-4 max-w-xs">
+                            <span className="px-2.5 py-1.5 bg-gold/15 rounded-lg font-mono text-xs font-semibold text-gold leading-normal block border border-gold/10">
+                              {bk.preorderDishes || 'Exquisite Cuisines (Custom preorder)'}
+                            </span>
+                          </td>
+                          <td className="p-4 font-mono text-center">
+                            <span className="px-2 py-1 bg-white/5 rounded-md font-bold text-white/90">{bk.guests} Diners</span>
+                          </td>
+                          <td className="p-4">
+                            <span className="block font-bold">{bk.date}</span>
+                            <span className="font-mono text-white/40 text-[10px]">{bk.time} IST</span>
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-[8.5px] font-bold tracking-widest uppercase shrink-0 ${
+                              bk.status === 'Confirmed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                              bk.status === 'Cancelled' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                              'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                            }`}>
+                              {bk.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex justify-end gap-1.5 animate-fade-in">
+                              {bk.status === 'Confirmed' && (
+                                <button
+                                  onClick={() => {
+                                    const cleanedPhone = bk.phone.replace(/\D/g, '');
+                                    const validPhone = cleanedPhone.length === 10 ? '91' + cleanedPhone : cleanedPhone;
+                                    const message = `*Gastronomy Pre-Order Confirmed! 🌟*\n\nHello *${bk.name}*,\n\nWe are delighted to inform you that your Lucknowi family food pre-order is now *CONFIRMED*!\n\n*Preordered Dishes:*\n🍽️ ${bk.preorderDishes || 'Exquisite Royal Cuisines'}\n\n*Reservation Slot:*\n📅 *Date:* ${bk.date}\n⏰ *Time:* ${bk.time}\n👥 *Guests:* ${bk.guests} Guests\n\nOur kitchen has started preparing details for your select menu. Looking forward to hosting you soon.\n\nWarm regards,\n*Shubham Family Restaurant & Hotel Team*`;
+                                    const whatsappUrl = `https://wa.me/${validPhone}?text=${encodeURIComponent(message)}`;
+                                    window.open(whatsappUrl, '_blank');
+                                  }}
+                                  className="p-1 px-2.5 rounded-md bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 text-[10px] uppercase font-bold transition-all cursor-pointer flex items-center gap-1"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  <span>WhatsApp</span>
+                                </button>
+                              )}
+                              {bk.status !== 'Confirmed' && (
+                                <button
+                                  onClick={() => updateBookingStatus(bk.id, 'Confirmed')}
+                                  className="p-1 px-2.5 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-[10px] uppercase font-bold transition-all cursor-pointer"
+                                >
+                                  Accept
+                                </button>
+                              )}
+                              {bk.status !== 'Cancelled' && (
+                                <button
+                                  onClick={() => updateBookingStatus(bk.id, 'Cancelled')}
+                                  className="p-1 px-2.5 rounded-md bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-[10px] uppercase font-bold transition-all cursor-pointer"
+                                >
+                                  Decline
+                                </button>
+                              )}
+                              <button
+                                onClick={() => deleteBooking(bk.id)}
+                                className="p-1 rounded-md text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>

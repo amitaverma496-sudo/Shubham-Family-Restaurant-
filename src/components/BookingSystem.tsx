@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, Clock, Sparkles, BookOpen, Smile, FileCheck, X, AlertTriangle, Search, History, Smartphone, Check, MessageSquare } from 'lucide-react';
+import { Calendar, Users, Clock, Sparkles, BookOpen, Smile, FileCheck, X, AlertTriangle, Search, History, Smartphone, Check, MessageSquare, Utensils, ShieldCheck } from 'lucide-react';
 import { Booking } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { doc, setDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 
 interface BookingSystemProps {
   onAddBooking: (booking: Omit<Booking, 'id' | 'createdAt' | 'status'>) => void;
@@ -29,6 +31,23 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
   const [showCustomTimeInput, setShowCustomTimeInput] = useState(false);
   const [customTimeVal, setCustomTimeVal] = useState('7:30 PM');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [successInfoMessage, setSuccessInfoMessage] = useState<string | null>(null);
+
+  // Check URL query parameters for dynamic ticket lookup & auto-confirm invitation mode
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ticketParam = params.get('ticket') || params.get('lookup') || params.get('confirm');
+    if (ticketParam) {
+      setHistoryQuery(ticketParam);
+      setHasSearched(true);
+      setActiveTab('history');
+      
+      const section = document.getElementById('reservations');
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, []);
 
   // Auto populate special requests if pre-ordered dishes exist
   useEffect(() => {
@@ -110,6 +129,19 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
     setValidationError(null);
     setIsSuccess(false);
     setCreatedTicket(null);
+  };
+
+  const handleConfirmPreorderPublicly = async (booking: Booking) => {
+    try {
+      const updated: Booking = {
+        ...booking,
+        status: 'Confirmed'
+      };
+      await setDoc(doc(db, 'bookings', booking.id), updated);
+      setSuccessInfoMessage(`Excellent choice! Royal Pre-order ticket ${booking.id} has been authenticated & confirmed in real-time. Kitchen & Admin notified!`);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `bookings/${booking.id}`);
+    }
   };
 
   // Filter bookings for history lookup based on the query input
@@ -624,10 +656,17 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
                         const isConfirmed = b.status === 'Confirmed';
                         const isCancelled = b.status === 'Cancelled';
                         
-                        // Parse pre-ordered dishes from the specialRequest
+                        // Parse pre-ordered dishes comprehensively from either field
                         let preorderedDishes: string[] = [];
-                        if (b.specialRequest && b.specialRequest.includes('Pre-ordered Culinary Delicacies:')) {
+                        if (b.preorderDishes) {
+                          preorderedDishes = b.preorderDishes.split(',').map(s => s.trim()).filter(Boolean);
+                        } else if (b.specialRequest && b.specialRequest.includes('Pre-ordered Culinary Delicacies:')) {
                           const parts = b.specialRequest.split('Pre-ordered Culinary Delicacies:');
+                          if (parts[1]) {
+                            preorderedDishes = parts[1].split(',').map(s => s.trim()).filter(Boolean);
+                          }
+                        } else if (b.specialRequest && b.specialRequest.includes('Pre-ordered culinary:')) {
+                          const parts = b.specialRequest.split('Pre-ordered culinary:');
                           if (parts[1]) {
                             preorderedDishes = parts[1].split(',').map(s => s.trim()).filter(Boolean);
                           }
@@ -699,8 +738,17 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
                               </div>
                             ) : null}
 
-                            {/* Instant WhatsApp Action on history ticket item */}
-                            <div className="pt-2 border-t border-white/5 flex gap-2 justify-end font-mono">
+                            {/* Actions on history ticket item */}
+                            <div className="pt-2 border-t border-white/5 flex flex-wrap gap-2 justify-end font-mono">
+                              {b.bookingType === 'preorder' && b.status === 'Pending' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleConfirmPreorderPublicly(b)}
+                                  className="px-3.5 py-1.5 rounded-lg bg-gold/25 text-gold hover:bg-gold hover:text-black border border-gold/40 hover:border-transparent text-[9px] uppercase font-black tracking-widest transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                                >
+                                  <ShieldCheck className="w-3.5 h-3.5 animate-pulse text-gold hover:text-black" /> Confirm Pre-Order
+                                </button>
+                              )}
                               <a
                                 href={`https://wa.me/917800335000?text=Hello%20Shubham%20Family%20Restaurant,%20I%20have%20an%20existing%20table%20reservation%20under%2520the%2520name%2520${b.name}%2520for%2520${b.guests}%2520on%2520${b.date}%2520at%2520${b.time}.%2520Booking%2520Code:%2520${b.id}.`}
                                 target="_blank"
@@ -767,6 +815,57 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
                   className="w-full py-3 rounded-full bg-gold hover:bg-gold/90 text-black text-[10px] font-extrabold tracking-widest uppercase transition-all duration-200 cursor-pointer shadow-[0_4px_12px_rgba(212,175,55,0.2)] active:scale-95"
                 >
                   Understood & Amend Entry
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom Premium Success Overlay for Public Real-Time Confirmations */}
+        <AnimatePresence>
+          {successInfoMessage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+              onClick={() => setSuccessInfoMessage(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                className="bg-lux-card border border-gold/30 max-w-sm w-full rounded-3xl p-6 relative shadow-[0_15px_50px_rgba(212,175,55,0.15)] text-center space-y-5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setSuccessInfoMessage(null)}
+                  className="absolute right-4 top-4 text-white/40 hover:text-white p-1 rounded-full hover:bg-white/5 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                {/* Success Icon */}
+                <div className="w-14 h-14 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center mx-auto text-gold animate-bounce">
+                  <Check className="w-6 h-6" />
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-serif text-lg text-gold tracking-wider uppercase">PRE-ORDER CONFIRMED</h4>
+                  <p className="text-white/80 text-xs leading-relaxed font-sans">
+                    {successInfoMessage}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSuccessInfoMessage(null)}
+                  className="w-full py-3 rounded-full bg-gold hover:bg-gold/90 text-black text-[10px] font-extrabold tracking-widest uppercase transition-all duration-200 cursor-pointer shadow-[0_4px_12px_rgba(212,175,55,0.25)] active:scale-95"
+                >
+                  Return to Dashboard
                 </button>
               </motion.div>
             </motion.div>

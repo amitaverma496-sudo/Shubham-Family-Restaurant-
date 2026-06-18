@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "Booking": {
+      "title": "Booking",
+      "description": "Pre-order bookings made by guests.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique booking ID." },
+        "name": { "type": "string", "description": "Customer name." },
+        "phone": { "type": "string", "description": "Customer phone number." },
+        "guests": { "type": "integer", "description": "Number of guests." },
+        "date": { "type": "string", "description": "Date of the booking." },
+        "time": { "type": "string", "description": "Time of the booking." },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Cancelled"], "description": "Booking status." },
+        "specialRequest": { "type": "string", "description": "Optional special request." },
+        "createdAt": { "type": "string", "description": "ISO timestamp for creation." }
+      },
+      "required": ["id", "name", "phone", "guests", "date", "time", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Collection storing guest pre-orders."
+    }
+  }
+}
