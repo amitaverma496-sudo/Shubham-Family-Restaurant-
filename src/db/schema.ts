@@ -10,3 +10,11 @@ export const guests = pgTable('guests', {
   lastLogin: timestamp('last_login').defaultNow(),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  fullName: text('full_name').notNull(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});

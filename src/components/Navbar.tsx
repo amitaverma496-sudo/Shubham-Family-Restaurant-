@@ -6,12 +6,9 @@ interface NavbarProps {
   onNavClick: (sectionId: string) => void;
   onAdminToggle: () => void;
   isAdminMode: boolean;
-  user: any;
-  onSignOut: () => void;
-  onSignIn: () => void;
 }
 
-export default function Navbar({ onNavClick, onAdminToggle, isAdminMode, user, onSignOut, onSignIn }: NavbarProps) {
+export default function Navbar({ onNavClick, onAdminToggle, isAdminMode }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const navLinks = [
@@ -75,41 +72,6 @@ export default function Navbar({ onNavClick, onAdminToggle, isAdminMode, user, o
               {isAdminMode ? 'Exit Suite' : 'Executive Suite'}
             </button>
 
-            {/* Google Authentication Status Widget */}
-            {user ? (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-[11px] text-white/90">
-                {user.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt={user.displayName}
-                    referrerPolicy="no-referrer"
-                    className="w-5 h-5 rounded-full border border-gold/40"
-                  />
-                ) : (
-                  <div className="w-5 h-5 rounded-full bg-gold/25 flex items-center justify-center text-gold font-serif text-[9px] font-black border border-gold/30">
-                    {user.displayName ? user.displayName.substring(0, 1).toUpperCase() : 'G'}
-                  </div>
-                )}
-                <span className="font-serif text-white/80 font-bold tracking-tight max-w-[90px] truncate">{user.displayName || 'Guest'}</span>
-                <span className="text-white/20">|</span>
-                <button
-                  id="google-signout-btn"
-                  onClick={onSignOut}
-                  className="font-mono text-[9px] text-gold hover:text-white uppercase tracking-wider font-bold"
-                >
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <button
-                id="google-signin-btn"
-                onClick={onSignIn}
-                className="px-4 py-1.5 rounded-full border border-white/10 hover:border-gold/30 bg-white/5 hover:bg-gold/10 text-white/85 text-[11px] tracking-wider font-semibold uppercase transition-all duration-300"
-              >
-                Sign In
-              </button>
-            )}
-
             {/* Direct Booking CTA */}
             <button
               onClick={() => handleLinkClick('booking')}
@@ -121,15 +83,6 @@ export default function Navbar({ onNavClick, onAdminToggle, isAdminMode, user, o
 
           {/* Mobile Right Bar buttons */}
           <div className="flex lg:hidden items-center gap-3">
-            {user && (
-              <img
-                src={user.photoURL}
-                alt=""
-                referrerPolicy="no-referrer"
-                className="w-6 h-6 rounded-full border border-gold/40"
-              />
-            )}
-
             <button
               onClick={onAdminToggle}
               className={`p-1.5 rounded-full border text-[10px] uppercase transition-all duration-300 ${
@@ -186,48 +139,6 @@ export default function Navbar({ onNavClick, onAdminToggle, isAdminMode, user, o
               </div>
 
               <div className="space-y-4">
-                {user ? (
-                  <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-4">
-                    {user.photoURL ? (
-                      <img 
-                        src={user.photoURL} 
-                        alt="" 
-                        referrerPolicy="no-referrer" 
-                        className="w-10 h-10 rounded-full border border-gold/40" 
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gold/25 flex items-center justify-center text-gold font-serif font-black border border-gold/30">
-                        {user.displayName ? user.displayName.substring(0, 1).toUpperCase() : 'G'}
-                      </div>
-                    )}
-                    <div className="flex-1 text-left">
-                      <div className="text-xs font-serif font-black text-white">{user.displayName || 'Distinguished Guest'}</div>
-                      <div className="text-[10px] font-mono text-white/45 truncate">{user.email}</div>
-                    </div>
-                    <button 
-                      id="google-signout-btn"
-                      onClick={() => {
-                        setIsOpen(false);
-                        onSignOut();
-                      }}
-                      className="text-xs text-red-400 font-mono tracking-wider font-bold uppercase transition-colors hover:text-red-300"
-                    >
-                      Logout
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    id="google-signin-btn"
-                    onClick={() => {
-                      setIsOpen(false);
-                      onSignIn();
-                    }}
-                    className="w-full text-center px-6 py-3 rounded-full bg-white text-black transition-all duration-300 text-xs font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(255,255,255,0.1)] cursor-pointer"
-                  >
-                    Guest Sign In
-                  </button>
-                )}
-
                 <button
                   onClick={() => handleLinkClick('booking')}
                   className="w-full text-center px-6 py-3 rounded-full border border-gold bg-gold text-black transition-all duration-300 text-xs font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(212,175,55,0.2)]"

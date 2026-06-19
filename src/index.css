@@ -34,12 +34,16 @@
 
 /* Custom gorgeous animations & custom scrollbars */
 @layer base {
-  body {
+  html, body {
     background-color: #0B0B0C;
     color: #FFFFFF;
     font-family: var(--font-sans);
     overflow-x: hidden;
     scroll-behavior: smooth;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
   }
 
   /* Custom thin scrollbar */
@@ -189,4 +193,18 @@
   animation: live-pulse-zoom 16s ease-in-out infinite;
   will-change: transform;
 }
+
+@keyframes grid {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(var(--cell-size, 60px));
+  }
+}
+
+.animate-grid {
+  animation: grid 15s linear infinite;
+}
+
 
