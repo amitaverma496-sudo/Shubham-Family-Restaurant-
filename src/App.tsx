@@ -12,7 +12,7 @@ import { MenuItem, Booking, GalleryItem, Inquiry } from './types';
 
 // Import Firestore database sync and Auth support
 import { collection, query, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signOut, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { db, handleFirestoreError, OperationType, auth, googleProvider } from './firebase';
 
 // Import Seed Data
@@ -42,6 +42,32 @@ export default function App() {
 
   // Monitor Auth state changes
   useEffect(() => {
+    // Process Google redirect result if any
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result?.user) {
+          const firebaseUser = result.user;
+          setUser(firebaseUser);
+          setShowSignInGate(false);
+          setAuthLoading(false);
+          try {
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            await setDoc(userRef, {
+              uid: firebaseUser.uid,
+              displayName: firebaseUser.displayName || 'Distinguished Guest',
+              email: firebaseUser.email,
+              photoURL: firebaseUser.photoURL || '',
+              lastLogin: new Date().toISOString()
+            }, { merge: true });
+          } catch (dbErr) {
+            console.error("Failed to write redirect registration after Google Redirect login:", dbErr);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn("Redirect result parsing did not yield active session profile:", err);
+      });
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
@@ -84,11 +110,11 @@ export default function App() {
         const role = target.getAttribute('role');
         const isCursorPointer = target.classList.contains('cursor-pointer');
         
-        // Prevent blocking clicks inside the Google-provided popup or the Sign-In gate itself
+        // Prevent blocking clicks inside the Google-provided popup/buttons or the Sign-In gate itself
         if (
-          target.id === 'google-signin-btn' || 
+          target.closest('#google-signin-btn') || 
           target.closest('#signin-container') ||
-          target.id === 'google-signout-btn'
+          target.closest('#google-signout-btn')
         ) {
           return;
         }
@@ -121,6 +147,7 @@ export default function App() {
 
   const handleSignInGoogle = async () => {
     try {
+      // Try popping up first
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
       if (firebaseUser) {
@@ -139,8 +166,14 @@ export default function App() {
           console.error("Failed to write profile record to document on immediate sign in:", dbErr);
         }
       }
-    } catch (err) {
-      console.error("Google sign in failure:", err);
+    } catch (err: any) {
+      console.warn("Popup authentication did not complete. Launching Google Redirect fallback routing...", err);
+      // Clean fallback for mobile devices, WebViews or popup-blocked sessions
+      try {
+        await signInWithRedirect(auth, googleProvider);
+      } catch (redirectErr) {
+        console.error("Redirect auth fallback threw:", redirectErr);
+      }
     }
   };
 
