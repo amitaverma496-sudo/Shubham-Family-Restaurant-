@@ -38,23 +38,29 @@ export default function AdminPanel({
   const menuFormRef = useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    const q = collection(db, 'users');
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched: any[] = [];
-      snapshot.forEach((d) => {
-        fetched.push({ id: d.id, ...d.data() });
-      });
-      // Sort in memory by lastLogin (descending)
-      fetched.sort((a, b) => {
-        const timeA = a.lastLogin ? new Date(a.lastLogin).getTime() : 0;
-        const timeB = b.lastLogin ? new Date(b.lastLogin).getTime() : 0;
-        return timeB - timeA;
-      });
-      setVerifiedUsers(fetched);
-    }, (error) => {
-      console.error("error loading verified users:", error);
-    });
-    return () => unsubscribe();
+    const fetchGuests = async () => {
+      try {
+        const res = await fetch('/api/guests');
+        if (res.ok) {
+          const fetched = await res.json();
+          // Sort in memory by lastLogin (descending)
+          fetched.sort((a: any, b: any) => {
+            const timeA = a.lastLogin ? new Date(a.lastLogin).getTime() : 0;
+            const timeB = b.lastLogin ? new Date(b.lastLogin).getTime() : 0;
+            return timeB - timeA;
+          });
+          setVerifiedUsers(fetched);
+        } else {
+          console.warn("Failed retrieving guest records from SQLite database:", res.statusText);
+        }
+      } catch (error) {
+        console.error("Error loading verified users from SQL database:", error);
+      }
+    };
+
+    fetchGuests();
+    const timer = setInterval(fetchGuests, 4000); // Polling SQL backend updates every 4 seconds
+    return () => clearInterval(timer);
   }, []);
   
   // States of forms

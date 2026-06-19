@@ -40,6 +40,27 @@ export default function App() {
   const [showSignInGate, setShowSignInGate] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
+  const syncUserToSql = async (firebaseUser: any) => {
+    try {
+      await fetch('/api/guests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          uid: firebaseUser.uid,
+          displayName: firebaseUser.displayName || 'Distinguished Guest',
+          email: firebaseUser.email,
+          photoURL: firebaseUser.photoURL || '',
+          phone: firebaseUser.phoneNumber || '',
+          lastLogin: new Date().toISOString()
+        })
+      });
+    } catch (err) {
+      console.error("Failed to sync authenticated guest to SQL database:", err);
+    }
+  };
+
   // Monitor Auth state changes
   useEffect(() => {
     // Process Google redirect result if any
@@ -50,18 +71,7 @@ export default function App() {
           setUser(firebaseUser);
           setShowSignInGate(false);
           setAuthLoading(false);
-          try {
-            const userRef = doc(db, 'users', firebaseUser.uid);
-            await setDoc(userRef, {
-              uid: firebaseUser.uid,
-              displayName: firebaseUser.displayName || 'Distinguished Guest',
-              email: firebaseUser.email,
-              photoURL: firebaseUser.photoURL || '',
-              lastLogin: new Date().toISOString()
-            }, { merge: true });
-          } catch (dbErr) {
-            console.error("Failed to write redirect registration after Google Redirect login:", dbErr);
-          }
+          await syncUserToSql(firebaseUser);
         }
       })
       .catch((err) => {
@@ -74,19 +84,8 @@ export default function App() {
         setShowSignInGate(false);
         setAuthLoading(false);
         
-        // Securely post profile details to users log
-        try {
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          await setDoc(userRef, {
-            uid: firebaseUser.uid,
-            displayName: firebaseUser.displayName || 'Distinguished Guest',
-            email: firebaseUser.email,
-            photoURL: firebaseUser.photoURL || '',
-            lastLogin: new Date().toISOString()
-          }, { merge: true });
-        } catch (err) {
-          console.error("Failed to post verified user credential log to database:", err);
-        }
+        // Securely post profile details to SQLite relational SQL database
+        await syncUserToSql(firebaseUser);
       } else {
         setUser(null);
         setAuthLoading(false);
@@ -153,18 +152,7 @@ export default function App() {
       if (firebaseUser) {
         setUser(firebaseUser);
         setShowSignInGate(false);
-        try {
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          await setDoc(userRef, {
-            uid: firebaseUser.uid,
-            displayName: firebaseUser.displayName || 'Distinguished Guest',
-            email: firebaseUser.email,
-            photoURL: firebaseUser.photoURL || '',
-            lastLogin: new Date().toISOString()
-          }, { merge: true });
-        } catch (dbErr) {
-          console.error("Failed to write profile record to document on immediate sign in:", dbErr);
-        }
+        await syncUserToSql(firebaseUser);
       }
     } catch (err: any) {
       console.warn("Popup authentication did not complete. Launching Google Redirect fallback routing...", err);
