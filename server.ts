@@ -12,33 +12,38 @@ app.use(express.json());
 // API route FIRST
 app.post("/api/guests", async (req, res) => {
   try {
-    const { email, phone } = req.body;
-    if (!email || !phone) {
-      return res.status(400).json({ error: "Email and phone number are required." });
+    const { uid, email, displayName, photoURL, phone, lastLogin } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Email is required." });
     }
 
     const emailLower = email.trim().toLowerCase();
-    const phoneCleaned = phone.trim();
     const username = emailLower.split("@")[0];
-    const uidGenerated = `sql_guest_${username}`;
-    const displayNameGenerated = username.charAt(0).toUpperCase() + username.slice(1);
-    const photoURLGenerated = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(emailLower)}`;
+    const uidClean = uid || `sql_guest_${username}`;
+    const displayNameClean = displayName || (username.charAt(0).toUpperCase() + username.slice(1));
+    const photoURLClean = photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(emailLower)}`;
+    const phoneClean = phone ? phone.trim() : null;
+    const loginTime = lastLogin ? new Date(lastLogin) : new Date();
 
     // Query layer error isolation
     try {
       await db.insert(guests)
         .values({
-          uid: uidGenerated,
+          uid: uidClean,
           email: emailLower,
-          displayName: displayNameGenerated,
-          photoURL: photoURLGenerated,
-          phone: phoneCleaned,
+          displayName: displayNameClean,
+          photoURL: photoURLClean,
+          phone: phoneClean,
+          lastLogin: loginTime,
         })
         .onConflictDoUpdate({
           target: guests.email,
           set: {
-            phone: phoneCleaned,
-            lastLogin: new Date(),
+            uid: uidClean,
+            displayName: displayNameClean,
+            photoURL: photoURLClean,
+            phone: phoneClean,
+            lastLogin: loginTime,
           }
         });
       

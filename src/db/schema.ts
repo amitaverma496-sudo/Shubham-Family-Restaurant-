@@ -6,7 +6,7 @@ export const guests = pgTable('guests', {
   email: text('email').notNull().unique(),
   displayName: text('display_name'),
   photoURL: text('photo_url'),
-  phone: text('phone').notNull(),
+  phone: text('phone'),
   lastLogin: timestamp('last_login').defaultNow(),
   createdAt: timestamp('created_at').defaultNow(),
 });
