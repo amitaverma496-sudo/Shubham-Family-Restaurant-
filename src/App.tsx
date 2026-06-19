@@ -33,8 +33,8 @@ import { HeroScrollDemo } from '@/components/ui/demo';
 import { HeroSectionDemo } from './components/blocks/demo';
 
 // Image paths generated earlier
-const INTERIOR_URL = '/src/assets/images/shubham_interior_1781759760975.jpg';
-const DISH_URL = '/src/assets/images/shubham_dish_1781759777106.jpg';
+const INTERIOR_URL = 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=1200';
+const DISH_URL = 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&q=80&w=1200';
 
 export default function App() {
   // --- CORE STATE PERSISTENCE CLIENT-SIDE ENGINE ---
