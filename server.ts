@@ -1,127 +1,77 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
+import { db } from "./src/db/index.ts";
+import { guests } from "./src/db/schema.ts";
+import { desc } from "drizzle-orm";
 
 const app = express();
 const PORT = 3000;
 
-// Initialize a robust, pure JS Relational SQL Database Engine.
-// This operates with 100% pure JS, completely eliminating native C++ binary binding failures (node-gyp/sqlite3) in Cloud Run,
-// while executing clean, query-compliant relational storage with logging.
-class RelationalSQLEngine {
-  private dbPath = path.join(process.cwd(), "database_relational.json");
-
-  constructor() {
-    this.initTable();
-  }
-
-  private initTable() {
-    console.log("[SQL Log] Executing query: CREATE TABLE IF NOT EXISTS guests (uid TEXT PRIMARY KEY, email TEXT NOT NULL, displayName TEXT, photoURL TEXT, phone TEXT, lastLogin TEXT)");
-    if (!fs.existsSync(this.dbPath)) {
-      try {
-        fs.writeFileSync(this.dbPath, JSON.stringify({}), "utf-8");
-        console.log("[SQL Log] Relational table 'guests' initialized successfully.");
-      } catch (err) {
-        console.error("Failed to initialize Relational table file:", err);
-      }
-    }
-  }
-
-  private readAll(): Record<string, any> {
-    try {
-      if (fs.existsSync(this.dbPath)) {
-        const content = fs.readFileSync(this.dbPath, "utf-8");
-        return JSON.parse(content || "{}");
-      }
-    } catch (err) {
-      console.error("Error reading SQL relational database file:", err);
-    }
-    return {};
-  }
-
-  private writeAll(data: Record<string, any>) {
-    try {
-      fs.writeFileSync(this.dbPath, JSON.stringify(data, null, 2), "utf-8");
-    } catch (err) {
-      console.error("Error writing SQL relational database file:", err);
-    }
-  }
-
-  public async runUpsert(uid: string, row: any): Promise<void> {
-    console.log(`[SQL Log] Executing SQL Query:
-      INSERT INTO guests (uid, email, displayName, photoURL, phone, lastLogin)
-      VALUES ('${uid}', '${row.email}', '${row.displayName || 'NULL'}', '${row.photoURL || 'NULL'}', '${row.phone || 'NULL'}', '${row.lastLogin}')
-      ON CONFLICT(uid) DO UPDATE SET
-        email = excluded.email,
-        displayName = excluded.displayName,
-        photoURL = excluded.photoURL,
-        phone = COALESCE(excluded.phone, guests.phone),
-        lastLogin = excluded.lastLogin;`
-    );
-
-    const data = this.readAll();
-    const existing = data[uid] || {};
-    data[uid] = {
-      uid: uid,
-      email: row.email,
-      displayName: row.displayName !== undefined ? row.displayName : (existing.displayName || null),
-      photoURL: row.photoURL !== undefined ? row.photoURL : (existing.photoURL || null),
-      phone: row.phone !== undefined ? row.phone : (existing.phone || null),
-      lastLogin: row.lastLogin || new Date().toISOString()
-    };
-    this.writeAll(data);
-  }
-
-  public async selectAllSorted(): Promise<any[]> {
-    console.log("[SQL Log] Executing SQL Query: SELECT * FROM guests ORDER BY datetime(lastLogin) DESC;");
-    const data = this.readAll();
-    return Object.values(data).sort((a: any, b: any) => {
-      const timeA = a.lastLogin ? new Date(a.lastLogin).getTime() : 0;
-      const timeB = b.lastLogin ? new Date(b.lastLogin).getTime() : 0;
-      return timeB - timeA;
-    });
-  }
-}
-
-const db = new RelationalSQLEngine();
-
-// Express configuration
 app.use(express.json());
 
-// --- RESTful API ROUTES (must be declared BEFORE Vite middleware) ---
-
-// Create or update a Guest credential row inside the Relational SQL Engine
+// API route FIRST
 app.post("/api/guests", async (req, res) => {
   try {
-    const { uid, email, displayName, photoURL, phone, lastLogin } = req.body;
-    
-    if (!uid || !email) {
-      return res.status(400).json({ error: "Missing required key fields: uid and email" });
+    const { email, phone } = req.body;
+    if (!email || !phone) {
+      return res.status(400).json({ error: "Email and phone number are required." });
     }
 
-    await db.runUpsert(uid, {
-      email,
-      displayName,
-      photoURL,
-      phone,
-      lastLogin
-    });
+    const emailLower = email.trim().toLowerCase();
+    const phoneCleaned = phone.trim();
+    const username = emailLower.split("@")[0];
+    const uidGenerated = `sql_guest_${username}`;
+    const displayNameGenerated = username.charAt(0).toUpperCase() + username.slice(1);
+    const photoURLGenerated = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(emailLower)}`;
 
-    console.log(`[SQL Log] Guest Auth sync completed successfully: ${email}`);
-    res.json({ success: true, message: `Identities synchronized via SQL for user: ${email}` });
+    // Query layer error isolation
+    try {
+      await db.insert(guests)
+        .values({
+          uid: uidGenerated,
+          email: emailLower,
+          displayName: displayNameGenerated,
+          photoURL: photoURLGenerated,
+          phone: phoneCleaned,
+        })
+        .onConflictDoUpdate({
+          target: guests.email,
+          set: {
+            phone: phoneCleaned,
+            lastLogin: new Date(),
+          }
+        });
+      
+      console.log(`[SQL Log] Upserted guest row for: ${emailLower}`);
+      res.json({ success: true, message: `Identity synchronized for: ${emailLower}` });
+    } catch (queryErr: any) {
+      console.error("Database upsert failure:", queryErr);
+      throw new Error("Unable to save credentials to database.", { cause: queryErr });
+    }
   } catch (error: any) {
-    console.error("[SQL Fail] Failed executing guest UPSERT on SQL database:", error);
     res.status(500).json({ error: error.message || "SQL Transaction Error occurred" });
   }
 });
 
-// Retrieve all authenticated guest accounts from SQL
 app.get("/api/guests", async (req, res) => {
   try {
-    const rows = await db.selectAllSorted();
-    res.json(rows);
+    try {
+      const rows = await db.select().from(guests).orderBy(desc(guests.createdAt));
+      // Map columns from schema to expected frontend keys
+      const mapped = rows.map((r) => ({
+        uid: r.uid || `guest_${r.id}`,
+        email: r.email,
+        displayName: r.displayName || r.email.split("@")[0],
+        photoURL: r.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(r.email)}`,
+        phone: r.phone,
+        lastLogin: r.lastLogin ? r.lastLogin.toISOString() : new Date().toISOString()
+      }));
+      res.json(mapped);
+    } catch (queryErr: any) {
+      console.error("Database select failure:", queryErr);
+      throw new Error("Unable to fetch guest list from database.", { cause: queryErr });
+    }
   } catch (error: any) {
-    console.error("[SQL Fail] Failed executing guest SELECT in SQL database:", error);
     res.status(500).json({ error: error.message || "SQL Query Error occurred" });
   }
 });
