@@ -16,12 +16,29 @@
         "createdAt": { "type": "string", "description": "ISO timestamp for creation." }
       },
       "required": ["id", "name", "phone", "guests", "date", "time", "status", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile with information from Google Sign-In.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique Google user ID." },
+        "displayName": { "type": "string", "description": "User display name." },
+        "email": { "type": "string", "description": "User Gmail/email address." },
+        "photoURL": { "type": "string", "description": "User profile photo URL." },
+        "lastLogin": { "type": "string", "description": "ISO timestamp for last login." }
+      },
+      "required": ["uid", "email", "lastLogin"]
     }
   },
   "firestore": {
     "/bookings/{bookingId}": {
       "schema": "Booking",
       "description": "Collection storing guest pre-orders."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection storing registered user profiles from Google Sign-In."
     }
   }
 }

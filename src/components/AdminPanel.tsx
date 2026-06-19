@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Booking, MenuItem, GalleryItem, Inquiry, MenuCategory } from '../types';
 import { motion } from 'motion/react';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 
 interface AdminPanelProps {
@@ -20,7 +20,7 @@ interface AdminPanelProps {
   setInquiries: React.Dispatch<React.SetStateAction<Inquiry[]>>;
 }
 
-type TabType = 'table_bookings' | 'preorders' | 'menu' | 'gallery' | 'inquiries';
+type TabType = 'table_bookings' | 'preorders' | 'menu' | 'gallery' | 'inquiries' | 'users_accounts';
 
 export default function AdminPanel({
   bookings, setBookings,
@@ -32,8 +32,30 @@ export default function AdminPanel({
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [unlockError, setUnlockError] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('table_bookings');
+  const [verifiedUsers, setVerifiedUsers] = useState<any[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
   
   const menuFormRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const q = collection(db, 'users');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetched: any[] = [];
+      snapshot.forEach((d) => {
+        fetched.push({ id: d.id, ...d.data() });
+      });
+      // Sort in memory by lastLogin (descending)
+      fetched.sort((a, b) => {
+        const timeA = a.lastLogin ? new Date(a.lastLogin).getTime() : 0;
+        const timeB = b.lastLogin ? new Date(b.lastLogin).getTime() : 0;
+        return timeB - timeA;
+      });
+      setVerifiedUsers(fetched);
+    }, (error) => {
+      console.error("error loading verified users:", error);
+    });
+    return () => unsubscribe();
+  }, []);
   
   // States of forms
   const [newDish, setNewDish] = useState({
@@ -345,6 +367,16 @@ export default function AdminPanel({
         >
           <MailCheck className="w-3.5 h-3.5" />
           Inquiries ({totalInquiries})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('users_accounts')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-300 whitespace-nowrap ${
+            activeTab === 'users_accounts' ? 'bg-gold text-black' : 'bg-white/5 hover:bg-white/10 text-white/80'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          Verified Guests ({verifiedUsers.length})
         </button>
       </div>
 
@@ -1207,6 +1239,113 @@ export default function AdminPanel({
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* 5. VERIFIED GOOGLE GUESTS & CLIENTS ACCOUNTS */}
+        {activeTab === 'users_accounts' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="font-serif text-lg text-gold uppercase tracking-wider">Verified Google Accounts Log</h2>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-white/40" />
+                <input
+                  type="text"
+                  placeholder="Search by name or email..."
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-9 pr-4 text-xs text-white placeholder-white/30 focus:border-gold outline-none transition-all duration-300"
+                />
+              </div>
+            </div>
+
+            {/* Metric widgets for verification stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="glass p-5 rounded-2xl border border-white/5 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gold/10 flex items-center justify-center border border-gold/20">
+                  <Users className="w-5 h-5 text-gold" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-white/40 block">Total Registered Guests</span>
+                  <span className="text-xl font-bold font-mono text-white mt-0.5 block">{verifiedUsers.length}</span>
+                </div>
+              </div>
+              <div className="glass p-5 rounded-2xl border border-white/5 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-white/40 block">Identity Provider Status</span>
+                  <span className="text-sm font-semibold text-emerald-400 mt-0.5 block">Google OAuth • Active</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Table or list representation */}
+            {(() => {
+              const filteredUsers = verifiedUsers.filter(u => 
+                (u.displayName?.toLowerCase() || '').includes(userSearchQuery.toLowerCase()) ||
+                (u.email?.toLowerCase() || '').includes(userSearchQuery.toLowerCase())
+              );
+
+              if (filteredUsers.length === 0) {
+                return (
+                  <div className="glass text-center py-12 rounded-2xl border border-white/8">
+                    <Users className="w-8 h-8 text-white/30 mx-auto mb-3" />
+                    <p className="text-sm text-white/40 tracking-wider uppercase font-mono">
+                      {userSearchQuery ? 'No matching guests found' : 'No guest Google authentication records yet'}
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="glass border border-white/5 rounded-2xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs text-white/80 border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/3 uppercase tracking-widest font-mono text-[9px] text-white/50">
+                          <th className="py-4 px-6 font-semibold font-mono">Avatar & Guest</th>
+                          <th className="py-4 px-6 font-semibold font-mono">Gmail / Email</th>
+                          <th className="py-4 px-6 font-semibold font-mono">Google User ID</th>
+                          <th className="py-4 px-6 font-semibold font-mono">Last Authenticated Session</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 font-mono">
+                        {filteredUsers.map((guest) => (
+                          <tr key={guest.uid} className="hover:bg-white/1 transition-colors duration-200">
+                            <td className="py-4 px-6 flex items-center gap-3">
+                              {guest.photoURL ? (
+                                <img
+                                  src={guest.photoURL}
+                                  alt={guest.displayName}
+                                  referrerPolicy="no-referrer"
+                                  className="w-8 h-8 rounded-full border border-white/20 object-cover"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center text-gold border border-gold/30 font-serif font-black text-xs">
+                                  {guest.displayName ? guest.displayName.substring(0, 1).toUpperCase() : 'G'}
+                                </div>
+                              )}
+                              <span className="font-serif font-bold text-white text-sm">{guest.displayName || 'Distinguished Guest'}</span>
+                            </td>
+                            <td className="py-4 px-6">
+                              <span className="text-gold/90">{guest.email}</span>
+                            </td>
+                            <td className="py-4 px-6 text-[10px] text-white/40 select-all">
+                              {guest.uid}
+                            </td>
+                            <td className="py-4 px-6 text-[10px] text-teal-400">
+                              {guest.lastLogin ? new Date(guest.lastLogin).toLocaleString() : 'N/A'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

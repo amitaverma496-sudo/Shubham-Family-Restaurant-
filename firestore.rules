@@ -25,12 +25,27 @@ service cloud.firestore {
         && (!('preorderDishes' in data) || (data.preorderDishes is string && data.preorderDishes.size() <= 2048));
     }
 
+    function isValidUser(data) {
+      return data.uid is string && data.uid.size() <= 256
+        && data.email is string && data.email.size() <= 256
+        && data.lastLogin is string && data.lastLogin.size() <= 128
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 256))
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 4096));
+    }
+
     // Bookings collection – accessible by anyone to place pre-orders and check in real time.
     match /bookings/{bookingId} {
       allow read: if true;
       allow create: if isValidId(bookingId) && isValidBooking(request.resource.data);
       allow update: if isValidId(bookingId) && isValidBooking(request.resource.data);
       allow delete: if isValidId(bookingId);
+    }
+
+    // Users collection – user profiles from Google Sign-In.
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isValidId(userId) && request.auth != null && request.auth.uid == userId && isValidUser(request.resource.data);
+      allow delete: if false;
     }
   }
 }
