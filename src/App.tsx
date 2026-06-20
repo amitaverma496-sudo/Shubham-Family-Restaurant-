@@ -171,6 +171,16 @@ export default function App() {
     }
   };
 
+  // Parallax scroll state
+  const [scrollY, setScrollY] = useState(0);
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // --- ACTIONS ---
   const handleAddBooking = async (newBooking: Omit<Booking, 'id' | 'createdAt' | 'status'>) => {
     const created: Booking = {
@@ -422,10 +432,25 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4 }}
+            className="relative"
           >
             
+            {/* Global Subtle Parallax 3D background animation across the website, performance optimized */}
+            <div 
+              className="fixed inset-0 w-full h-full z-0 opacity-[0.08] pointer-events-none blur-[1px] transition-transform duration-75 ease-out"
+              style={{ transform: `translateY(${scrollY * -0.15}px)` }}
+            >
+              <NeuralBackground 
+                color="#D4AF37"
+                trailOpacity={0.16} 
+                particleCount={180} 
+                speed={0.35} 
+                scale={1}
+              />
+            </div>
+
             {/* HER0 DISPLAY LANDING CANVAS */}
-            <header id="home" className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
+            <header id="home" className="relative min-h-screen flex flex-col items-center justify-center pt-32 pb-44 px-4 sm:px-6 select-none overflow-hidden z-10">
               
               {/* Pure luxurious black background */}
               <div className="absolute inset-0 bg-[#0a0a0a] w-full h-full" />
@@ -473,26 +498,26 @@ export default function App() {
               <div className="absolute bottom-[-50px] left-[-50px] w-[300px] h-[300px] bg-gold opacity-[0.08] blur-[100px] rounded-full pointer-events-none" />
 
               {/* Content Panel Frame */}
-              <div className="max-w-6xl mx-auto px-4 z-20 text-center space-y-8 select-none">
+              <div className="max-w-6xl mx-auto px-4 z-20 text-center space-y-12 select-none">
                 
                 {/* Gold emblem badge floating enter */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.8 }}
-                  className="inline-flex items-center gap-2 justify-center px-4 py-1.5 glass rounded-full border border-gold/45 text-[10px] tracking-[0.4em] font-mono text-gold uppercase md:scale-100 scale-90"
+                  className="inline-flex items-center gap-2 justify-center px-5 py-2 glass rounded-full border border-gold/45 text-[10px] sm:text-xs tracking-[0.45em] font-mono text-gold uppercase md:scale-100 scale-90"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-gold animate-pulseAndScale" /> 
+                  <Sparkles className="w-4 h-4 text-gold animate-pulseAndScale animate-duration-1000" /> 
                   A Premium Family Dining Experience
                 </motion.div>
 
                 {/* Restaurant Large Typography */}
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <motion.h1
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.2 }}
-                    className="font-serif text-5xl sm:text-7xl md:text-8xl lg:text-[100px] text-3d-gold tracking-widest leading-none uppercase"
+                    className="font-serif text-5xl sm:text-7xl md:text-8xl lg:text-[110px] text-3d-gold tracking-widest leading-none uppercase font-black"
                   >
                     SHUBHAM
                   </motion.h1>
@@ -500,7 +525,7 @@ export default function App() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 1, delay: 0.5 }}
-                    className="text-xs sm:text-sm md:text-base font-sans tracking-[0.45em] text-3d-silver block uppercase font-black"
+                    className="text-sm sm:text-base md:text-lg font-sans tracking-[0.5em] text-3d-silver block uppercase font-black"
                   >
                     FAMILY RESTAURANT & HOTEL
                   </motion.p>
@@ -510,32 +535,32 @@ export default function App() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 1, delay: 0.7 }}
-                    className="text-[10px] sm:text-[11px] font-mono tracking-widest text-[#F4D03F]/80 max-w-lg mx-auto font-medium"
+                    className="text-xs sm:text-sm font-mono tracking-widest text-[#F4D03F]/80 max-w-2xl mx-auto font-semibold leading-relaxed"
                   >
                     STARTING POINT, SHREE TILAK COMPLEX, AGRA EXPRESSWAY, LUCKNOW
                   </motion.p>
                 </div>
 
-                <div className="w-16 h-[1px] bg-gold/50 mx-auto" />
+                <div className="w-24 h-[1px] bg-gold/50 mx-auto my-4" />
 
                 {/* Theme Stats Grid Indicator */}
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.7 }}
-                  className="grid grid-cols-3 gap-4 max-w-2xl mx-auto pt-2"
+                  className="grid grid-cols-3 gap-6 max-w-3xl mx-auto pt-4"
                 >
-                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl backdrop-blur-sm hover:border-gold/35 transition-all">
-                    <div className="text-gold mb-1 font-mono font-bold text-base sm:text-lg">★ 4.8</div>
-                    <div className="text-[9px] uppercase tracking-wider text-white/50">Customer Rating</div>
+                  <div className="p-5 bg-white/[0.03] border border-white/10 rounded-2xl backdrop-blur-sm hover:border-gold/35 hover:bg-white/[0.05] transition-all duration-300">
+                    <div className="text-gold mb-1 font-mono font-bold text-lg sm:text-xl">★ 4.8</div>
+                    <div className="text-[10px] tracking-wider text-white/50 uppercase font-mono">Customer Rating</div>
                   </div>
-                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl backdrop-blur-sm hover:border-gold/35 transition-all">
-                    <div className="text-white mb-1 font-mono font-bold text-base sm:text-lg">33k+</div>
-                    <div className="text-[9px] uppercase tracking-wider text-white/50">Happy Diners</div>
+                  <div className="p-5 bg-white/[0.03] border border-white/10 rounded-2xl backdrop-blur-sm hover:border-gold/35 hover:bg-white/[0.05] transition-all duration-300">
+                    <div className="text-white mb-1 font-mono font-bold text-lg sm:text-xl">33k+</div>
+                    <div className="text-[10px] tracking-wider text-white/50 uppercase font-mono">Happy Diners</div>
                   </div>
-                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl backdrop-blur-sm hover:border-gold/35 transition-all">
-                    <div className="text-white mb-1 font-serif font-bold text-xs sm:text-sm pt-0.5">LUCKNOW</div>
-                    <div className="text-[9px] uppercase tracking-wider text-white/50">Agra Expressway</div>
+                  <div className="p-5 bg-white/[0.03] border border-white/10 rounded-2xl backdrop-blur-sm hover:border-gold/35 hover:bg-white/[0.05] transition-all duration-300">
+                    <div className="text-white mb-1 font-serif font-bold text-sm sm:text-base pt-0.5">LUCKNOW</div>
+                    <div className="text-[10px] tracking-wider text-white/50 uppercase font-mono">Agra Expressway</div>
                   </div>
                 </motion.div>
 
@@ -544,7 +569,7 @@ export default function App() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.8 }}
-                  className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 md:scale-100 scale-95"
+                  className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-6 md:scale-105 scale-95"
                 >
                   <LiquidButton
                     variant="primary"
@@ -558,6 +583,24 @@ export default function App() {
                   >
                     View Gourmet Menu
                   </LiquidButton>
+                </motion.div>
+
+                {/* Premium Restaurant Imagery Centerpiece */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.9 }}
+                  className="max-w-5xl mx-auto pt-10"
+                >
+                  <div className="relative rounded-3xl overflow-hidden border border-white/10 shadow-[0_25px_60px_rgba(212,175,55,0.18)] bg-slate-950/40 p-2 backdrop-blur-sm group hover:border-gold/30 transition-all duration-500">
+                    <img 
+                      src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=1200" 
+                      alt="Shubham Premium Family Dining Experience" 
+                      className="w-full h-auto rounded-2xl object-cover aspect-video md:aspect-[21/9] filter brightness-95 group-hover:scale-[1.01] transition-transform duration-700 select-none"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent opacity-65" />
+                  </div>
                 </motion.div>
 
               </div>
@@ -575,21 +618,8 @@ export default function App() {
 
             </header>
 
-            <HeroScrollDemo />
-
-            <HeroSectionDemo />
-
             {/* BENTO GRID LUXURY VALUES SECTION */}
             <section id="features" className="py-24 border-t border-white/5 bg-lux-black relative overflow-hidden">
-              {/* Background ambient flow-field texture */}
-              <div className="absolute inset-0 w-full h-full opacity-30 z-0 pointer-events-none">
-                <NeuralBackground 
-                  trailOpacity={0.18} 
-                  particleCount={150} 
-                  speed={0.4} 
-                  scale={1}
-                />
-              </div>
               <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
                 
                 {/* Header title */}
