@@ -4,6 +4,7 @@ import { Booking } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
+import { GlowCard } from '@/components/ui/spotlight-card';
 
 interface BookingSystemProps {
   onAddBooking: (booking: Omit<Booking, 'id' | 'createdAt' | 'status'>) => void;
@@ -216,12 +217,17 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
             !isSuccess ? (
               <motion.div
                 key="booking-form"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              className="bg-lux-card p-8 rounded-3xl border border-lux-border gold-box-glow"
-            >
-              <form onSubmit={handleSubmit} className="space-y-6 text-xs text-left">
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                className="w-full"
+              >
+                <GlowCard
+                  customSize={true}
+                  glowColor="gold"
+                  className="p-8"
+                >
+                  <form onSubmit={handleSubmit} className="space-y-6 text-xs text-left">
                 
                 {/* Name & Phone in Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -484,18 +490,24 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
                 </button>
 
               </form>
-            </motion.div>
+                </GlowCard>
+              </motion.div>
           ) : (
             <motion.div
               key="booking-success"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-lux-card p-8 rounded-3xl border border-lux-border text-center space-y-6 max-w-md mx-auto gold-box-glow"
+              className="max-w-md mx-auto w-full"
             >
-              <div className="w-16 h-16 rounded-full bg-gold/10 border border-gold/40 flex items-center justify-center mx-auto">
-                <FileCheck className="w-8 h-8 text-gold" />
-              </div>
+              <GlowCard
+                customSize={true}
+                glowColor="gold"
+                className="p-8 text-center space-y-6 w-full"
+              >
+                <div className="w-16 h-16 rounded-full bg-gold/10 border border-gold/40 flex items-center justify-center mx-auto">
+                  <FileCheck className="w-8 h-8 text-gold" />
+                </div>
               
               <div className="space-y-2">
                 <h3 className="font-serif text-2xl text-white tracking-wider uppercase">TABLE SECURED</h3>
@@ -552,6 +564,7 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
                 </a>
               </div>
 
+                </GlowCard>
             </motion.div>
           )) : (
             <motion.div
@@ -559,9 +572,14 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
-              className="bg-lux-card p-6 sm:p-8 rounded-3xl border border-lux-border gold-box-glow space-y-6"
+              className="w-full"
             >
-              <div className="text-center space-y-2 mb-4">
+              <GlowCard
+                customSize={true}
+                glowColor="gold"
+                className="p-6 sm:p-8 space-y-6 w-full"
+              >
+                <div className="text-center space-y-2 mb-4">
                 <h3 className="font-serif text-lg md:text-xl tracking-wider text-white uppercase flex items-center justify-center gap-2">
                   <History className="w-5 h-5 text-gold" /> PAST PRE-ORDERS & TABLES
                 </h3>
@@ -661,21 +679,23 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
                         if (b.preorderDishes) {
                           preorderedDishes = b.preorderDishes.split(',').map(s => s.trim()).filter(Boolean);
                         } else if (b.specialRequest && b.specialRequest.includes('Pre-ordered Culinary Delicacies:')) {
-                          const parts = b.specialRequest.split('Pre-ordered Culinary Delicacies:');
+                           const parts = b.specialRequest.split('Pre-ordered Culinary Delicacies:');
                           if (parts[1]) {
                             preorderedDishes = parts[1].split(',').map(s => s.trim()).filter(Boolean);
                           }
                         } else if (b.specialRequest && b.specialRequest.includes('Pre-ordered culinary:')) {
-                          const parts = b.specialRequest.split('Pre-ordered culinary:');
+                           const parts = b.specialRequest.split('Pre-ordered culinary:');
                           if (parts[1]) {
                             preorderedDishes = parts[1].split(',').map(s => s.trim()).filter(Boolean);
                           }
                         }
 
                         return (
-                          <div 
+                          <GlowCard 
                             key={b.id} 
-                            className="bg-lux-black border border-lux-border rounded-2xl p-5 text-left space-y-4 relative overflow-hidden transition-all hover:border-gold/30"
+                            customSize={true}
+                            glowColor="gold"
+                            className="p-5 text-left space-y-4 relative overflow-hidden"
                           >
                             <div className="flex justify-between items-center border-b border-white/5 pb-3 font-mono">
                               <div className="space-y-0.5">
@@ -759,14 +779,15 @@ export default function BookingSystem({ onAddBooking, selectedDishes, bookings =
                               </a>
                             </div>
 
-                          </div>
+                          </GlowCard>
                         );
                       })}
                     </div>
                   </div>
                 )}
               </div>
-            </motion.div>
+            </GlowCard>
+          </motion.div>
           )}
         </AnimatePresence>
 

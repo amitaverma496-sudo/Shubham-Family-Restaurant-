@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, ShoppingBag, UtensilsCrossed, Sparkles, Award, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MenuItem, MenuCategory } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { GlowCard } from '@/components/ui/spotlight-card';
 
 interface MenuSectionProps {
   menuItems: MenuItem[];
@@ -78,11 +79,15 @@ export default function MenuSection({
 
         {/* Chef's Recommendation Highlight Carousel Panel */}
         {recommendedDishes.length > 0 && (
-          <div className="mb-20 bg-lux-card border border-lux-border rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-[0_15px_45px_rgba(59,130,246,0.06)]">
+          <GlowCard 
+            customSize={true} 
+            glowColor="gold" 
+            className="mb-20 p-6 sm:p-8 relative overflow-hidden shadow-[0_15px_45px_rgba(59,130,246,0.06)]"
+          >
             <div className="absolute right-0 top-0 w-80 h-80 bg-gold/5 blur-[100px] rounded-full pointer-events-none" />
             <div className="absolute left-0 bottom-0 w-80 h-80 bg-gold/3 blur-[100px] rounded-full pointer-events-none" />
             
-            <div className="flex flex-col md:flex-row gap-8 items-center relative z-10">
+            <div className="flex flex-col md:flex-row gap-8 items-center relative z-10 w-full">
               {/* Left Column: Carousel Branding & Switch Actions */}
               <div className="w-full md:w-1/3 flex flex-col justify-between items-center text-center md:items-start md:text-left h-full border-b md:border-b-0 md:border-r border-lux-border pb-6 md:pb-0 md:pr-8 gap-4">
                 <div className="space-y-3">
@@ -200,7 +205,7 @@ export default function MenuSection({
                 </AnimatePresence>
               </div>
             </div>
-          </div>
+          </GlowCard>
         )}
 
         {/* Categories Bar & Search bar */}
@@ -273,86 +278,91 @@ export default function MenuSection({
 
         {/* Menu Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <AnimatePresence mode="popLayout">
-            {filteredItems.map((item, index) => {
+          <AnimatePresence>
+            {filteredItems.map((item) => {
               const isSelected = selectedDishes.includes(item.name);
               
               return (
                 <motion.div
                   key={item.id}
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.4, delay: Math.min(index * 0.05, 0.3) }}
-                  className="group rounded-3xl border border-lux-border bg-lux-card p-5 flex flex-col justify-between hover:border-gold/30 hover:shadow-[0_15px_40px_rgba(59,130,246,0.05)] transition-all duration-500 relative"
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.2 }}
+                  className="h-full"
                 >
-                  
-                  {/* Decorative faint golden line on top of each card */}
-                  <div className="absolute top-0 left-10 right-10 h-[1px] bg-gradient-to-r from-transparent via-gold/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                  <div className="space-y-4">
+                  <GlowCard
+                    customSize={true}
+                    glowColor="gold"
+                    className="group h-full p-5 flex flex-col justify-between"
+                  >
                     
-                    {/* Header: diet Tag, premium category and rating */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        {item.isVeg ? (
-                          <span className="w-4 h-4 border border-emerald-500 flex items-center justify-center p-0.5 rounded-sm" title="Pure Vegetarian">
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block" />
+                    {/* Decorative faint golden line on top of each card */}
+                    <div className="absolute top-0 left-10 right-10 h-[1px] bg-gradient-to-r from-transparent via-gold/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                    <div className="space-y-4">
+                      
+                      {/* Header: diet Tag, premium category and rating */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          {item.isVeg ? (
+                            <span className="w-4 h-4 border border-emerald-500 flex items-center justify-center p-0.5 rounded-sm" title="Pure Vegetarian">
+                              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block" />
+                            </span>
+                          ) : (
+                            <span className="w-4 h-4 border border-red-500 flex items-center justify-center p-0.5 rounded-sm" title="Halal / Non-Veg">
+                              <span className="w-1.5 h-1.5 bg-red-500 rounded-full inline-block" />
+                            </span>
+                          )}
+                          <span className="text-[9px] uppercase tracking-[0.2em] text-white/40 block font-mono">
+                            {item.category}
                           </span>
-                        ) : (
-                          <span className="w-4 h-4 border border-red-500 flex items-center justify-center p-0.5 rounded-sm" title="Halal / Non-Veg">
-                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full inline-block" />
+                        </div>
+                        
+                        {item.isPopular && (
+                          <span className="text-[8px] font-mono font-bold tracking-widest text-gold bg-gold/10 border border-gold/30 px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
+                            <Sparkles className="w-2.5 h-2.5 text-gold" /> Chef Star
                           </span>
                         )}
-                        <span className="text-[9px] uppercase tracking-[0.2em] text-white/40 block font-mono">
-                          {item.category}
-                        </span>
                       </div>
-                      
-                      {item.isPopular && (
-                        <span className="text-[8px] font-mono font-bold tracking-widest text-gold bg-gold/10 border border-gold/30 px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
-                          <Sparkles className="w-2.5 h-2.5 text-gold" /> Chef Star
-                        </span>
-                      )}
+
+                      {/* Dish Name & Price */}
+                      <div>
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="font-serif text-base md:text-lg text-white font-extrabold tracking-wide uppercase group-hover:text-gold transition-colors duration-300">
+                            {item.name}
+                          </h3>
+                        </div>
+                        <div className="font-mono text-gold text-sm font-semibold tracking-wider mt-1 block">
+                          ₹{item.price}
+                        </div>
+                      </div>
+
+                      {/* Dish Description */}
+                      <p className="text-white/60 text-xs tracking-wide leading-relaxed font-sans line-clamp-3">
+                        {item.description}
+                      </p>
+
                     </div>
 
-                    {/* Dish Name & Price */}
-                    <div>
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="font-serif text-base md:text-lg text-white font-extrabold tracking-wide uppercase group-hover:text-gold transition-colors duration-300">
-                          {item.name}
-                        </h3>
-                      </div>
-                      <div className="font-mono text-gold text-sm font-semibold tracking-wider mt-1 block">
-                        ₹{item.price}
-                      </div>
+                    {/* Add pre-order CTA footer */}
+                    <div className="pt-6 mt-4 border-t border-white/5 flex items-center justify-between">
+                      <span className="text-[9.5px] tracking-wider text-white/35 font-semibold font-mono">
+                        FRESH • MADE TO ORDER
+                      </span>
+                      <button
+                        onClick={() => onAddToRequest(item.name)}
+                        className={`text-[10px] uppercase tracking-widest font-bold px-4 py-2 rounded-full border transition-all duration-300 cursor-pointer ${
+                          isSelected 
+                            ? 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500 hover:text-black hover:border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+                            : 'bg-white/4 hover:bg-gold hover:text-black border-white/8 hover:border-gold'
+                        }`}
+                      >
+                        {isSelected ? 'Remove ✕' : 'Add to Table'}
+                      </button>
                     </div>
 
-                    {/* Dish Description */}
-                    <p className="text-white/60 text-xs tracking-wide leading-relaxed font-sans line-clamp-3">
-                      {item.description}
-                    </p>
-
-                  </div>
-
-                  {/* Add pre-order CTA footer */}
-                  <div className="pt-6 mt-4 border-t border-white/5 flex items-center justify-between">
-                    <span className="text-[9.5px] tracking-wider text-white/35 font-semibold font-mono">
-                      FRESH • MADE TO ORDER
-                    </span>
-                    <button
-                      onClick={() => onAddToRequest(item.name)}
-                      className={`text-[10px] uppercase tracking-widest font-bold px-4 py-2 rounded-full border transition-all duration-300 cursor-pointer ${
-                        isSelected 
-                          ? 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500 hover:text-black hover:border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.1)]'
-                          : 'bg-white/4 hover:bg-gold hover:text-black border-white/8 hover:border-gold'
-                      }`}
-                    >
-                      {isSelected ? 'Remove ✕' : 'Add to Table'}
-                    </button>
-                  </div>
-
+                  </GlowCard>
                 </motion.div>
               );
             })}

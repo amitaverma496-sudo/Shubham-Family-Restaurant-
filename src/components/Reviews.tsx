@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Star, MessageSquareQuote, Send, Compass, Quote } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { GlowCard } from '@/components/ui/spotlight-card';
 
 interface ReviewItem {
   id: string;
@@ -91,14 +92,16 @@ export default function Reviews({ onAddReview, reviewsList }: ReviewsProps) {
           <div className="lg:col-span-2 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {reviewsList.map((rev) => (
-                <div 
+                <GlowCard 
                   key={rev.id} 
-                  className="bg-lux-card p-6 rounded-3xl border border-lux-border relative flex flex-col justify-between hover:border-gold/20 hover:scale-[1.01] transition-all duration-300"
+                  customSize={true}
+                  glowColor="gold"
+                  className="p-6 relative flex flex-col justify-between"
                 >
                   <Quote className="w-10 h-10 text-gold/8 absolute right-6 top-6 shrink-0" />
                   
                   <div className="space-y-3">
-                    <div className="flex gap-0.5 text-gold">
+                    <div className="flex gap-0.5 mb-1 text-gold">
                       {[...Array(5)].map((_, i) => (
                         <Star 
                           key={i} 
@@ -127,7 +130,7 @@ export default function Reviews({ onAddReview, reviewsList }: ReviewsProps) {
                       <span className="text-[9px] font-mono text-white/40">{rev.date} • Verified Guest</span>
                     </div>
                   </div>
-                </div>
+                </GlowCard>
               ))}
             </div>
 
@@ -152,80 +155,86 @@ export default function Reviews({ onAddReview, reviewsList }: ReviewsProps) {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="bg-lux-card p-6 rounded-3xl border border-lux-border space-y-4 text-xs text-left gold-box-glow"
+                  className="w-full"
                 >
-                  <div className="border-b border-gold/12 pb-3 flex items-center justify-between">
-                    <h3 className="font-serif text-base text-gold uppercase tracking-wider">Leave Feedback</h3>
-                    <button
-                      onClick={() => setIsAdding(false)}
-                      className="text-[10px] tracking-wider text-white/40 hover:text-white uppercase font-mono"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-
-                  {successMsg ? (
-                    <div className="py-8 text-center text-teal-400 font-bold uppercase tracking-wider space-y-2">
-                      <p>✓ Published!</p>
-                      <p className="text-white/60 font-medium text-[10px] tracking-wide mt-2">{successMsg}</p>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                      
-                      <div>
-                        <label className="block text-white/60 uppercase tracking-widest text-[9px] mb-1.5 font-semibold">Your Name*</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Mrs. Gupta"
-                          value={formData.name}
-                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                          className="w-full bg-black/60 border border-white/12 text-white px-4 py-2.5 rounded-xl outline-none focus:border-gold transition-colors placeholder:text-white/20"
-                        />
-                      </div>
-
-                      {/* Stars count slider */}
-                      <div>
-                        <label className="block text-white/60 uppercase tracking-widest text-[9px] mb-1.5 font-semibold">Star Rating: <span className="text-gold">{formData.rating} Stars</span></label>
-                        <div className="flex gap-2">
-                          {[1, 2, 3, 4, 5].map((starValue) => (
-                            <button
-                              type="button"
-                              key={starValue}
-                              onClick={() => setFormData(prev => ({ ...prev, rating: starValue }))}
-                              className="text-gold focus:outline-none hover:scale-110 transition-transform"
-                            >
-                              <Star 
-                                className={`w-5 h-5 fill-current ${
-                                  starValue <= formData.rating ? 'text-gold' : 'text-white/20'
-                                }`} 
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-white/60 uppercase tracking-widest text-[9px] mb-1.5 font-semibold">Your Review Details*</label>
-                        <textarea
-                          rows={4}
-                          required
-                          placeholder="How did our Kashmiri Dum Aloo, Dal Bukhara, and hotel room suite treat you?"
-                          value={formData.text}
-                          onChange={(e) => setFormData(prev => ({ ...prev, text: e.target.value }))}
-                          className="w-full bg-black/60 border border-white/12 text-white px-4 py-2 rounded-xl outline-none focus:border-gold transition-colors placeholder:text-white/20 resize-none font-sans leading-relaxed text-[11px]"
-                        />
-                      </div>
-
+                  <GlowCard
+                    customSize={true}
+                    glowColor="orange"
+                    className="p-6 space-y-4 text-xs text-left w-full"
+                  >
+                    <div className="border-b border-gold/12 pb-3 flex items-center justify-between">
+                      <h3 className="font-serif text-base text-gold uppercase tracking-wider">Leave Feedback</h3>
                       <button
-                        type="submit"
-                        className="w-full py-2.5 rounded-full bg-gold hover:bg-gold/90 text-black font-extrabold tracking-widest uppercase transition-all duration-300 shadow-[0_4px_15px_rgba(212,175,55,0.2)] cursor-pointer"
+                        onClick={() => setIsAdding(false)}
+                        className="text-[10px] tracking-wider text-white/40 hover:text-white uppercase font-mono"
                       >
-                        <Send className="w-3 h-3 inline mr-1.5" /> Submit Guest Entry
+                        Cancel
                       </button>
+                    </div>
 
-                    </form>
-                  )}
+                    {successMsg ? (
+                      <div className="py-8 text-center text-teal-400 font-bold uppercase tracking-wider space-y-2">
+                        <p>✓ Published!</p>
+                        <p className="text-white/60 font-medium text-[10px] tracking-wide mt-2">{successMsg}</p>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSubmit} className="space-y-4">
+                        
+                        <div>
+                          <label className="block text-white/60 uppercase tracking-widest text-[9px] mb-1.5 font-semibold">Your Name*</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Mrs. Gupta"
+                            value={formData.name}
+                            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                            className="w-full bg-black/60 border border-white/12 text-white px-4 py-2.5 rounded-xl outline-none focus:border-gold transition-colors placeholder:text-white/20"
+                          />
+                        </div>
+
+                        {/* Stars count slider */}
+                        <div>
+                          <label className="block text-white/60 uppercase tracking-widest text-[9px] mb-1.5 font-semibold">Star Rating: <span className="text-gold">{formData.rating} Stars</span></label>
+                          <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map((starValue) => (
+                              <button
+                                type="button"
+                                key={starValue}
+                                onClick={() => setFormData(prev => ({ ...prev, rating: starValue }))}
+                                className="text-gold focus:outline-none hover:scale-110 transition-transform"
+                              >
+                                <Star 
+                                  className={`w-5 h-5 fill-current ${
+                                    starValue <= formData.rating ? 'text-gold' : 'text-white/20'
+                                  }`} 
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-white/60 uppercase tracking-widest text-[9px] mb-1.5 font-semibold">Your Review Details*</label>
+                          <textarea
+                            rows={4}
+                            required
+                            placeholder="How did our Kashmiri Dum Aloo, Dal Bukhara, and hotel room suite treat you?"
+                            value={formData.text}
+                            onChange={(e) => setFormData(prev => ({ ...prev, text: e.target.value }))}
+                            className="w-full bg-black/60 border border-white/12 text-white px-4 py-2 rounded-xl outline-none focus:border-gold transition-colors placeholder:text-white/25 resize-none font-sans leading-relaxed text-[11px]"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 rounded-full bg-gold hover:bg-gold/90 text-black font-extrabold tracking-widest uppercase transition-all duration-300 shadow-[0_4px_15px_rgba(212,175,55,0.2)] cursor-pointer"
+                        >
+                          <Send className="w-3 h-3 inline mr-1.5" /> Submit Guest Entry
+                        </button>
+
+                      </form>
+                    )}
+                  </GlowCard>
                 </motion.div>
               )}
             </AnimatePresence>
