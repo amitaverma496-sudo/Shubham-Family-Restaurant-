@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Building2, Phone, MessageSquare, MapPin, Map, Share2, 
   HelpCircle, Send, Star, ExternalLink, ShieldCheck, Heart, Sparkles, Navigation, Globe, Plane,
@@ -31,6 +31,8 @@ import InteractiveMap from './components/InteractiveMap';
 import LiquidButton from './components/LiquidButton';
 import { HeroScrollDemo } from '@/components/ui/demo';
 import { HeroSectionDemo } from './components/blocks/demo';
+import NeuralBackground from '@/components/ui/flow-field-background';
+import Futuristic3DHologram from '@/components/ui/hero-futuristic';
 
 // Image paths generated earlier
 const INTERIOR_URL = 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=1200';
@@ -392,7 +394,7 @@ export default function App() {
         isAdminMode={isAdminMode}
       />
 
-      {/* 3. CONDITIONAL RENDER: BACK-OF-HOUSE ADMIN CONSOLE vs. FRONT-OF-HOUSE PUBLIC PORTAL */}
+       {/* 3. CONDITIONAL RENDER: BACK-OF-HOUSE ADMIN CONSOLE vs. FRONT-OF-HOUSE PUBLIC PORTAL */}
       <AnimatePresence mode="wait">
         {isAdminMode ? (
           <motion.div
@@ -425,13 +427,18 @@ export default function App() {
             {/* HER0 DISPLAY LANDING CANVAS */}
             <header id="home" className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
               
-              {/* Absolute background image layer with rich gold atmospheric vignette */}
-              <div 
-                className="absolute inset-0 bg-cover bg-center bg-no-repeat w-full h-full animate-live-kenburns"
-                style={{ 
-                  backgroundImage: `linear-gradient(to bottom, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0.4) 50%, rgba(10,10,10,0.95) 100%), url(${INTERIOR_URL})`
-                }}
-              />
+              {/* Pure luxurious black background */}
+              <div className="absolute inset-0 bg-[#0a0a0a] w-full h-full" />
+
+              {/* Dynamic Interactive Flow-Field Neural Background (Multi-hue Micro-Fluid 3D Systems) */}
+              <div className="absolute inset-0 w-full h-full z-[1] opacity-80 mix-blend-screen pointer-events-none font-sans">
+                <NeuralBackground 
+                  trailOpacity={0.15} 
+                  particleCount={300} 
+                  speed={0.6} 
+                  scale={1.3}
+                />
+              </div>
 
               {/* Reactive Gold Torch Flare mapping mouse movement */}
               <div 
@@ -557,7 +564,6 @@ export default function App() {
 
               {/* Chevron scroll guide indicator */}
               <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 cursor-pointer z-20" onClick={() => scrollToSection('features')}>
-                <span className="text-[9px] font-mono tracking-[0.3em] uppercase text-white/40 block">Scroll Guide</span>
                 <div className="w-5 h-8 border border-white/20 rounded-full flex justify-center p-1">
                   <motion.div 
                     animate={{ y: [0, 10, 0] }}
@@ -574,8 +580,17 @@ export default function App() {
             <HeroSectionDemo />
 
             {/* BENTO GRID LUXURY VALUES SECTION */}
-            <section id="features" className="py-24 border-t border-white/5 bg-lux-black relative">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <section id="features" className="py-24 border-t border-white/5 bg-lux-black relative overflow-hidden">
+              {/* Background ambient flow-field texture */}
+              <div className="absolute inset-0 w-full h-full opacity-30 z-0 pointer-events-none">
+                <NeuralBackground 
+                  trailOpacity={0.18} 
+                  particleCount={150} 
+                  speed={0.4} 
+                  scale={1}
+                />
+              </div>
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
                 
                 {/* Header title */}
                 <div className="text-center mb-16 space-y-4">
