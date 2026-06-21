@@ -8,11 +8,12 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 // Import Types
-import { MenuItem, Booking, GalleryItem, Inquiry } from './types';
+import { MenuItem, Booking, GalleryItem, Inquiry, UserProfile, ActivityLog } from './types';
 
 // Import Firestore database sync and Auth support
-import { collection, query, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './firebase';
+import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore';
+import { db, auth, googleProvider, handleFirestoreError, OperationType } from './firebase';
+import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 
 // Import Seed Data
 import { 
@@ -41,6 +42,128 @@ const INTERIOR_URL = 'https://images.unsplash.com/photo-1544025162-d76694265947?
 const DISH_URL = 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&q=80&w=1200';
 
 export default function App() {
+  // --- GOOGLE FIREBASE AUTHENTICATION FLOW STATE ---
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  // Helper: Write user activity logs to the Firestore logs collection
+  const logUserActivity = async (uid: string, displayName: string | null, email: string | null, action: string) => {
+    try {
+      const logId = 'log-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      const logRef = doc(db, 'activityLogs', logId);
+      await setDoc(logRef, {
+        id: logId,
+        uid,
+        displayName: displayName || 'Anonymous User',
+        email: email || '',
+        action,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error("Failed to write to activityLogs collection:", err);
+    }
+  };
+
+  // Helper: Create or update Firestore profile of active user
+  const updateOrCreateUserProfile = async (user: any) => {
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      let createdAt = new Date().toISOString();
+      try {
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && data.createdAt) {
+            createdAt = data.createdAt;
+          }
+        }
+      } catch (e) {
+        console.warn("Could not retrieve existing user to read createdAt", e);
+      }
+
+      const userData = {
+        uid: user.uid,
+        displayName: user.displayName || 'Anonymous Guest',
+        email: user.email || '',
+        photoURL: user.photoURL || '',
+        createdAt: createdAt,
+        lastLoginAt: new Date().toISOString(),
+        provider: 'Google'
+      };
+
+      await setDoc(userRef, userData);
+    } catch (error) {
+      console.error("Error creating/updating user profile in Firestore:", error);
+    }
+  };
+
+  // Listen to Auth State
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setCurrentUser(user);
+        // Silently update user profile (ensures fresh photo / name / lastLoginAt)
+        await updateOrCreateUserProfile(user);
+      } else {
+        setCurrentUser(null);
+      }
+      setIsLoadingAuth(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Secure interactive Google authentication sign-in
+  const handleSignIn = async (): Promise<any> => {
+    setIsLoadingAuth(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      await updateOrCreateUserProfile(user);
+      await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Sign-In");
+      return user;
+    } catch (err) {
+      console.error("Authentication Error:", err);
+    } finally {
+      setIsLoadingAuth(false);
+    }
+  };
+
+  // Logout session
+  const handleSignOut = async () => {
+    try {
+      if (auth.currentUser) {
+        await logUserActivity(
+          auth.currentUser.uid,
+          auth.currentUser.displayName,
+          auth.currentUser.email,
+          "Logged Out from Session"
+        );
+      }
+      await signOut(auth);
+    } catch (err) {
+      console.error("Logout Error:", err);
+    }
+  };
+
+  // Protective Interceptor wrapper for immediate inline actions
+  const executeProtectedAction = async (action: () => void | Promise<void>) => {
+    if (auth.currentUser) {
+      await action();
+    } else {
+      try {
+        const user = await handleSignIn();
+        if (user) {
+          // Pause slightly to allow Google sign-in state to propagate fully before continuing
+          setTimeout(async () => {
+            await action();
+          }, 300);
+        }
+      } catch (err) {
+        console.error("Interrupted protected action due to cancellation or sign-in issue:", err);
+      }
+    }
+  };
+
   // --- CORE STATE PERSISTENCE CLIENT-SIDE ENGINE ---
   const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
     const local = localStorage.getItem('shubham_menu_items');
@@ -116,6 +239,69 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Sync reviews in real-time from Firestore (Guest Testimonials)
+  useEffect(() => {
+    const q = query(collection(db, 'reviews'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetched: any[] = [];
+      snapshot.forEach((d) => {
+        fetched.push({ id: d.id, ...d.data() });
+      });
+      
+      if (snapshot.empty && fetched.length === 0) {
+        const local = localStorage.getItem('shubham_reviews');
+        const initial = local ? JSON.parse(local) : INITIAL_REVIEWS;
+        initial.forEach(async (r: any) => {
+          try {
+            await setDoc(doc(db, 'reviews', r.id), r);
+          } catch (err) {
+            console.error("Firestore reviews initialization seed error:", err);
+          }
+        });
+      } else {
+        fetched.sort((a, b) => b.id.localeCompare(a.id));
+        setReviewsList(fetched);
+      }
+    }, (error) => {
+      console.warn("Could not synchronize reviews (requires guest auth or read restricted):", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync inquiries in real-time from Firestore (Admin only)
+  useEffect(() => {
+    const isAdminUser = currentUser && (currentUser.email === 'amitaverma496@gmail.com');
+    if (!isAdminUser) {
+      setInquiries([]);
+      return;
+    }
+
+    const q = query(collection(db, 'inquiries'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetched: Inquiry[] = [];
+      snapshot.forEach((d) => {
+        fetched.push({ id: d.id, ...d.data() } as Inquiry);
+      });
+      
+      if (snapshot.empty && fetched.length === 0) {
+        const local = localStorage.getItem('shubham_inquiries');
+        const initial = local ? JSON.parse(local) : INITIAL_INQUIRIES;
+        initial.forEach(async (inq: Inquiry) => {
+          try {
+            await setDoc(doc(db, 'inquiries', inq.id), inq);
+          } catch (err) {
+            console.error("Firestore inquiries initialization seed error:", err);
+          }
+        });
+      } else {
+        setInquiries(fetched);
+      }
+    }, (error) => {
+      console.warn("Could not synchronize inquiries (non-admin restricted).");
+    });
+    return () => unsubscribe();
+  }, [currentUser]);
 
   useEffect(() => {
     localStorage.setItem('shubham_inquiries', JSON.stringify(inquiries));
@@ -281,17 +467,26 @@ export default function App() {
     // Note: We don't clear the selected dishes immediately so the success ticket can still compute total and display items. We can clear it if they close the success dialog.
   };
 
-  const handleAddReview = (newReview: Omit<any, 'id' | 'date' | 'avatar'>) => {
+  const handleAddReview = async (newReview: Omit<any, 'id' | 'date' | 'avatar'>) => {
     const created = {
       id: 'rev-' + Date.now(),
       ...newReview,
       date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-      avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&q=80&w=150`
+      avatar: auth.currentUser?.photoURL || `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&q=80&w=150`
     };
+    try {
+      await setDoc(doc(db, 'reviews', created.id), created);
+    } catch (err) {
+      try {
+        handleFirestoreError(err, OperationType.WRITE, `reviews/${created.id}`);
+      } catch (handledErr) {
+        console.error("Firestore reviews write error:", handledErr);
+      }
+    }
     setReviewsList(prev => [created, ...prev]);
   };
 
-  const handleAddInquiry = (e: React.FormEvent) => {
+  const handleAddInquiry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactForm.name || !contactForm.message) return;
 
@@ -304,10 +499,19 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
 
+    try {
+      await setDoc(doc(db, 'inquiries', created.id), created);
+      setContactForm({ name: '', phone: '', message: '' });
+      setContactSuccess('Your message was forwarded to the executive desk. Thank you for your inquiry.');
+      setTimeout(() => setContactSuccess(''), 4500);
+    } catch (err) {
+      try {
+        handleFirestoreError(err, OperationType.WRITE, `inquiries/${created.id}`);
+      } catch (handledErr) {
+        console.error("Firestore inquiry write error:", handledErr);
+      }
+    }
     setInquiries(prev => [created, ...prev]);
-    setContactForm({ name: '', phone: '', message: '' });
-    setContactSuccess('Your message was forwarded to the executive desk. Thank you for your inquiry.');
-    setTimeout(() => setContactSuccess(''), 4500);
   };
 
   // Add/remove/update gastronomy dish item for booking requests with quantity
@@ -424,6 +628,9 @@ export default function App() {
         onNavClick={scrollToSection} 
         onAdminToggle={() => setIsAdminMode(!isAdminMode)}
         isAdminMode={isAdminMode}
+        currentUser={currentUser}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
       />
 
        {/* 3. CONDITIONAL RENDER: BACK-OF-HOUSE ADMIN CONSOLE vs. FRONT-OF-HOUSE PUBLIC PORTAL */}
@@ -445,6 +652,8 @@ export default function App() {
               setGalleryItems={setGalleryItems}
               inquiries={inquiries}
               setInquiries={setInquiries}
+              currentUser={currentUser}
+              onSignIn={handleSignIn}
             />
           </motion.div>
         ) : (
@@ -834,13 +1043,13 @@ export default function App() {
 
             {/* GUEST TESTIMONIAL STAR DIRECTORY */}
             <Reviews 
-              onAddReview={handleAddReview}
+              onAddReview={(rev) => executeProtectedAction(() => handleAddReview(rev))}
               reviewsList={reviewsList}
             />
 
             {/* INTERACTIVE TABLE ACCORDION RESERVATION */}
             <BookingSystem 
-              onAddBooking={handleAddBooking} 
+              onAddBooking={(bk) => executeProtectedAction(() => handleAddBooking(bk))} 
               selectedDishes={selectedDishesForBooking.map(item => `${item.name} (x${item.quantity})`)}
               bookings={bookings}
             />
@@ -908,7 +1117,7 @@ export default function App() {
                         </div>
                       )}
 
-                      <form onSubmit={handleAddInquiry} className="space-y-4 text-xs">
+                      <form onSubmit={(e) => { e.preventDefault(); executeProtectedAction(() => handleAddInquiry(e)); }} className="space-y-4 text-xs">
                         <div className="grid grid-cols-2 gap-4">
                           <input
                             type="text"
@@ -1331,7 +1540,7 @@ export default function App() {
 
               {!preOrderSuccess ? (
                 /* Preorder details input form */
-                <form onSubmit={handlePreOrderFormSubmit} className="space-y-5">
+                <form onSubmit={(e) => { e.preventDefault(); executeProtectedAction(() => handlePreOrderFormSubmit(e)); }} className="space-y-5">
                   <div className="text-center space-y-1">
                     <span className="text-[9px] font-mono text-gold uppercase tracking-[0.25em] block">Saffron Dining Experience</span>
                     <h3 className="font-serif text-white text-xl uppercase font-black tracking-widest text-center">

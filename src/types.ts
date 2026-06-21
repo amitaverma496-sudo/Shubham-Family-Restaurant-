@@ -40,3 +40,23 @@ export interface Inquiry {
   status: 'Unread' | 'Replied';
   createdAt: string;
 }
+
+export interface UserProfile {
+  uid: string;
+  displayName: string;
+  email: string;
+  photoURL: string;
+  createdAt: string;
+  lastLoginAt: string;
+  provider: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  uid: string;
+  displayName: string;
+  email: string;
+  action: string;
+  timestamp: string;
+}
+

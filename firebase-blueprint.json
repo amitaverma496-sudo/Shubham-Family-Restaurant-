@@ -26,9 +26,53 @@
         "displayName": { "type": "string", "description": "User display name." },
         "email": { "type": "string", "description": "User Gmail/email address." },
         "photoURL": { "type": "string", "description": "User profile photo URL." },
-        "lastLogin": { "type": "string", "description": "ISO timestamp for last login." }
+        "createdAt": { "type": "string", "description": "ISO timestamp for user creation." },
+        "lastLoginAt": { "type": "string", "description": "ISO timestamp for last login." },
+        "provider": { "type": "string", "description": "Identity provider (Google)." }
       },
-      "required": ["uid", "email", "lastLogin"]
+      "required": ["uid", "email", "createdAt", "lastLoginAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Guest testimonials and reviews.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique review ID." },
+        "name": { "type": "string", "description": "Reviewer name." },
+        "rating": { "type": "integer", "description": "Rating out of 5 stars." },
+        "comment": { "type": "string", "description": "Review commentary text." },
+        "date": { "type": "string", "description": "Date of review." },
+        "avatar": { "type": "string", "description": "Reviewer avatar URL." }
+      },
+      "required": ["id", "name", "rating", "comment", "date", "avatar"]
+    },
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "Contact desk messages and inquiries from users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique inquiry ID." },
+        "name": { "type": "string", "description": "Sender name." },
+        "phone": { "type": "string", "description": "Sender contact phone." },
+        "message": { "type": "string", "description": "Message content." },
+        "status": { "type": "string", "enum": ["Read", "Unread"], "description": "Status of the inquiry." },
+        "createdAt": { "type": "string", "description": "ISO timestamp of submission." }
+      },
+      "required": ["id", "name", "phone", "message", "status", "createdAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Activity logs keeping track of logins and core actions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique log ID." },
+        "uid": { "type": "string", "description": "User's Google ID." },
+        "displayName": { "type": "string", "description": "User's display name." },
+        "email": { "type": "string", "description": "User's email." },
+        "action": { "type": "string", "description": "Action performed." },
+        "timestamp": { "type": "string", "description": "ISO timestamp for the action." }
+      },
+      "required": ["id", "uid", "email", "action", "timestamp"]
     }
   },
   "firestore": {
@@ -39,6 +83,18 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "Collection storing registered user profiles from Google Sign-In."
+    },
+    "/activityLogs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Collection storing user activity logs."
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Collection storing public reviews."
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": "Inquiry",
+      "description": "Collection storing guest inquiries and contact info."
     }
   }
 }

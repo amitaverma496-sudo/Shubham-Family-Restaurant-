@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
-import { Menu, X, Landmark, Compass, ShieldCheck } from 'lucide-react';
+import { Menu, X, Landmark, Compass, ShieldCheck, LogIn, LogOut, MoreVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface NavbarProps {
   onNavClick: (sectionId: string) => void;
   onAdminToggle: () => void;
   isAdminMode: boolean;
+  currentUser: any;
+  onSignIn: () => void;
+  onSignOut: () => void;
 }
 
-export default function Navbar({ onNavClick, onAdminToggle, isAdminMode }: NavbarProps) {
+export default function Navbar({ 
+  onNavClick, 
+  onAdminToggle, 
+  isAdminMode, 
+  currentUser, 
+  onSignIn, 
+  onSignOut 
+}: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const navLinks = [
     { label: 'Home', id: 'home' },
@@ -62,7 +73,7 @@ export default function Navbar({ onNavClick, onAdminToggle, isAdminMode }: Navba
             {/* Executive Admin Portal Button */}
             <button
               onClick={onAdminToggle}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[11px] tracking-wider font-semibold uppercase transition-all duration-300 ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[11px] tracking-wider font-semibold uppercase transition-all duration-300 cursor-pointer ${
                 isAdminMode
                   ? 'bg-gold text-black border-gold shadow-[0_0_15px_rgba(212,175,55,0.4)]'
                   : 'bg-white/5 hover:bg-gold/10 text-white/80 border-white/10 hover:border-gold'
@@ -71,6 +82,83 @@ export default function Navbar({ onNavClick, onAdminToggle, isAdminMode }: Navba
               <ShieldCheck className="w-3.5 h-3.5" />
               {isAdminMode ? 'Exit Suite' : 'Executive Suite'}
             </button>
+
+            {/* Google Authentication Control */}
+            {currentUser ? (
+              <div className="relative">
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 p-1.5 pl-3 rounded-full">
+                  {currentUser.photoURL ? (
+                    <img 
+                      src={currentUser.photoURL} 
+                      alt={currentUser.displayName || 'User'} 
+                      className="w-5.5 h-5.5 rounded-full border border-gold/30 object-cover" 
+                      referrerPolicy="no-referrer" 
+                    />
+                  ) : (
+                    <div className="w-5.5 h-5.5 rounded-full bg-gold/20 flex items-center justify-center text-[10px] text-gold font-black">
+                      {currentUser.displayName ? currentUser.displayName.charAt(0) : 'U'}
+                    </div>
+                  )}
+                  <span className="text-[10px] text-white/95 font-semibold font-sans tracking-wide max-w-[100px] truncate">
+                    {currentUser.displayName ? currentUser.displayName.split(' ')[0] : 'Guest'}
+                  </span>
+                  
+                  {/* Three Dots Button */}
+                  <button 
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
+                    className={`p-1 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-all duration-200 cursor-pointer ${isDropdownOpen ? 'bg-white/10 text-gold' : ''}`}
+                    title="Account options"
+                  >
+                    <MoreVertical className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Elegant 3-dots dropdown menu */}
+                <AnimatePresence>
+                  {isDropdownOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setIsDropdownOpen(false)} 
+                      />
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 mt-3 w-56 z-50 glass border border-white/10 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.6)] overflow-hidden"
+                      >
+                        <div className="p-3.5 border-b border-white/5 bg-white/[0.01]">
+                          <p className="text-[9px] font-mono tracking-widest text-gold uppercase mb-1">Executive Officer</p>
+                          <p className="text-xs font-bold text-white max-w-full truncate">{currentUser.displayName || 'Guest User'}</p>
+                          <p className="text-[9px] font-mono text-white/40 truncate mt-0.5">{currentUser.email}</p>
+                        </div>
+                        <div className="p-1.5 space-y-0.5">
+                          {/* Logout Button (Requested) */}
+                          <button
+                            onClick={() => {
+                              setIsDropdownOpen(false);
+                              onSignOut();
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[11px] font-sans font-bold hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-xl transition-all duration-200 cursor-pointer"
+                          >
+                            <LogOut className="w-3.5 h-3.5" />
+                            <span>Logout Session</span>
+                          </button>
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <button
+                onClick={onSignIn}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-gold/40 hover:border-gold hover:bg-gold/5 bg-gold/10 text-[10px] tracking-widest font-black text-gold uppercase transition-all duration-300 cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5 text-gold" />
+                Sign In
+              </button>
+            )}
 
             {/* Direct Booking CTA */}
             <button
@@ -139,9 +227,78 @@ export default function Navbar({ onNavClick, onAdminToggle, isAdminMode }: Navba
               </div>
 
               <div className="space-y-4">
+                {/* Mobile Google Auth Block */}
+                {currentUser ? (
+                  <div className="flex flex-col bg-white/5 border border-white/10 p-3.5 rounded-2xl mb-2 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {currentUser.photoURL ? (
+                          <img 
+                            src={currentUser.photoURL} 
+                            alt={currentUser.displayName || 'User'} 
+                            className="w-8 h-8 rounded-full border border-gold/30 object-cover" 
+                            referrerPolicy="no-referrer" 
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gold/20 flex items-center justify-center text-xs text-gold font-bold">
+                            {currentUser.displayName ? currentUser.displayName.charAt(0) : 'U'}
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-xs text-white/95 font-semibold font-sans">{currentUser.displayName || 'Guest User'}</div>
+                          <div className="text-[9px] text-white/40 truncate max-w-[140px] font-mono">{currentUser.email}</div>
+                        </div>
+                      </div>
+                      
+                      {/* Three Dots More options for mobile */}
+                      <button 
+                        onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
+                        className={`p-1.5 rounded-full text-white/50 hover:text-white transition-all duration-200 cursor-pointer ${isDropdownOpen ? 'bg-white/10' : ''}`}
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Collapsible Mobile 3-dots section logout options */}
+                    <AnimatePresence>
+                      {isDropdownOpen && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="pt-2 border-t border-white/5 overflow-hidden"
+                        >
+                          <button
+                            onClick={() => {
+                              setIsOpen(false);
+                              setIsDropdownOpen(false);
+                              onSignOut();
+                            }}
+                            className="w-full flex items-center gap-2.5 py-2.5 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold tracking-wider transition-all cursor-pointer"
+                          >
+                            <LogOut className="w-3.5 h-3.5" />
+                            <span>Logout Session</span>
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setIsOpen(false);
+                      onSignIn();
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-full border border-gold/30 bg-gold/5 text-xs text-gold font-bold tracking-widest uppercase transition-all hover:bg-gold/10 cursor-pointer mb-2"
+                  >
+                    <LogIn className="w-4 h-4 text-gold" />
+                    <span>Sign In With Google</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => handleLinkClick('booking')}
-                  className="w-full text-center px-6 py-3 rounded-full border border-gold bg-gold text-black transition-all duration-300 text-xs font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(212,175,55,0.2)]"
+                  className="w-full text-center px-6 py-3 rounded-full border border-gold bg-gold text-black transition-all duration-300 text-xs font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(212,175,55,0.2)] cursor-pointer"
                 >
                   Book Royal Table
                 </button>

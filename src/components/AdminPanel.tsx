@@ -1,10 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Users, Calendar, NotebookTabs, Image, MailCheck, Trash2, CheckCircle2, 
   XCircle, Filter, Plus, Compass, Sparkles, Check, KeySquare, ShieldCheck,
-  Search, Edit, X, MessageSquare, Utensils
+  Search, Edit, X, MessageSquare, Utensils, LogIn
 } from 'lucide-react';
-import { Booking, MenuItem, GalleryItem, Inquiry, MenuCategory } from '../types';
+import { Booking, MenuItem, GalleryItem, Inquiry, MenuCategory, UserProfile, ActivityLog } from '../types';
 import { motion } from 'motion/react';
 import { doc, setDoc, deleteDoc, collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
@@ -18,15 +18,18 @@ interface AdminPanelProps {
   setGalleryItems: React.Dispatch<React.SetStateAction<GalleryItem[]>>;
   inquiries: Inquiry[];
   setInquiries: React.Dispatch<React.SetStateAction<Inquiry[]>>;
+  currentUser: any;
+  onSignIn: () => Promise<any>;
 }
 
-type TabType = 'table_bookings' | 'preorders' | 'menu' | 'gallery' | 'inquiries';
+type TabType = 'table_bookings' | 'preorders' | 'menu' | 'gallery' | 'inquiries' | 'users' | 'activity_logs';
 
 export default function AdminPanel({
   bookings, setBookings,
   menuItems, setMenuItems,
   galleryItems, setGalleryItems,
-  inquiries, setInquiries
+  inquiries, setInquiries,
+  currentUser, onSignIn
 }: AdminPanelProps) {
   const [password, setPassword] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -50,6 +53,56 @@ export default function AdminPanel({
   // Filter state for bookings
   const [bookingFilter, setBookingFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Cancelled'>('All');
   const [preorderFilter, setPreorderFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Cancelled'>('All');
+
+  // Real-time Firestore users & logs states
+  const [dbUsers, setDbUsers] = useState<UserProfile[]>([]);
+  const [dbActivityLogs, setDbActivityLogs] = useState<ActivityLog[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [logSearchQuery, setLogSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!currentUser || currentUser.email !== 'amitaverma496@gmail.com') return;
+    
+    // Listen to users collection in Firestore
+    const usersQuery = query(collection(db, 'users'), orderBy('lastLoginAt', 'desc'));
+    const unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
+      const fetched: UserProfile[] = [];
+      snapshot.forEach(docSnap => {
+        fetched.push(docSnap.data() as UserProfile);
+      });
+      setDbUsers(fetched);
+    }, (err) => {
+      console.error("Error listening to users:", err);
+    });
+
+    // Listen to activity logs collection in Firestore
+    const logsQuery = query(collection(db, 'activityLogs'), orderBy('timestamp', 'desc'));
+    const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
+      const fetched: ActivityLog[] = [];
+      snapshot.forEach(docSnap => {
+        fetched.push(docSnap.data() as ActivityLog);
+      });
+      setDbActivityLogs(fetched);
+    }, (err) => {
+      console.error("Error listening to activityLogs:", err);
+    });
+
+    return () => {
+      unsubscribeUsers();
+      unsubscribeLogs();
+    };
+  }, [currentUser]);
+
+  // Derived filter states
+  const filteredUsers = dbUsers.filter(u => {
+    const q = userSearchQuery.toLowerCase();
+    return (u.displayName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || u.uid.includes(q);
+  });
+
+  const filteredLogs = dbActivityLogs.filter(l => {
+    const q = logSearchQuery.toLowerCase();
+    return (l.displayName || '').toLowerCase().includes(q) || (l.email || '').toLowerCase().includes(q) || (l.action || '').toLowerCase().includes(q);
+  });
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,13 +245,35 @@ export default function AdminPanel({
   };
 
   // Inquiries actions
-  const toggleInquiryReplied = (id: string) => {
+  const toggleInquiryReplied = async (id: string) => {
+    const inquiry = inquiries.find(inq => inq.id === id);
+    if (inquiry) {
+      const updatedStatus = inquiry.status === 'Unread' ? 'Replied' as const : 'Unread' as const;
+      try {
+        await setDoc(doc(db, 'inquiries', id), { ...inquiry, status: updatedStatus });
+      } catch (err) {
+        try {
+          handleFirestoreError(err, OperationType.WRITE, `inquiries/${id}`);
+        } catch (e) {
+          console.error("Firestore inquiry status update error:", e);
+        }
+      }
+    }
     setInquiries(prev => prev.map(inq => 
       inq.id === id ? { ...inq, status: inq.status === 'Unread' ? 'Replied' as const : 'Unread' as const } : inq
     ));
   };
 
-  const deleteInquiry = (id: string) => {
+  const deleteInquiry = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'inquiries', id));
+    } catch (err) {
+      try {
+        handleFirestoreError(err, OperationType.DELETE, `inquiries/${id}`);
+      } catch (e) {
+        console.error("Firestore inquiry deletion error:", e);
+      }
+    }
     setInquiries(prev => prev.filter(inq => inq.id !== id));
   };
 
@@ -221,43 +296,54 @@ export default function AdminPanel({
     return bk.status === preorderFilter;
   });
 
-  // Locked gate view
+  // Passcode unlock gate block (lucknow / lucknow123)
   if (!isUnlocked) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center px-4 py-16 text-center">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-sm glass p-6 sm:p-8 rounded-3xl border border-gold/20 shadow-[0_0_50px_rgba(212,175,55,0.05)]"
+          className="w-full max-w-md glass p-8 sm:p-10 rounded-3xl border border-gold/20 shadow-[0_0_50px_rgba(212,175,55,0.05)] text-center relative overflow-hidden"
         >
-          <div className="w-16 h-16 mx-auto rounded-full bg-gold/10 border border-gold/40 flex items-center justify-center mb-6">
-            <KeySquare className="w-8 h-8 text-gold" />
+          <div className="absolute inset-0 bg-gradient-to-b from-gold/[0.02] to-transparent pointer-events-none" />
+          
+          <div className="w-16 h-16 mx-auto rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center mb-6 relative">
+            <div className="absolute inset-0 rounded-full border border-gold/10 animate-ping opacity-30" />
+            <KeySquare className="w-7 h-7 text-gold" />
           </div>
+          
           <h2 className="font-serif text-2xl text-white tracking-widest uppercase mb-2 gold-glow">Executive Suite</h2>
-          <p className="text-white/60 text-[10px] sm:text-xs tracking-wider uppercase mb-6 leading-relaxed">
-            Enter Shabham Officer Password to Access the Live Dashboard
+          <p className="text-white/60 text-xs tracking-wider uppercase mb-8 leading-relaxed max-w-xs mx-auto">
+            Please enter your BOH secret passkey to access the Shubham Panel.
           </p>
 
-          <form onSubmit={handleUnlock} className="space-y-4">
-            <div className="space-y-1 text-center">
+          <form onSubmit={handleUnlock} className="space-y-5 relative z-10">
+            <div className="relative">
               <input
                 type="password"
-                placeholder="Enter Passcode Here"
+                placeholder="Enter Secret Passkey..."
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-black/60 border border-white/12 text-white px-5 py-3 rounded-full text-center text-xs tracking-widest placeholder:text-white/30 focus:border-gold outline-none transition-all duration-300 font-mono"
+                className="w-full bg-white/5 border border-white/10 focus:border-gold/30 rounded-full px-6 py-4 text-xs tracking-widest text-center text-white placeholder-white/30 outline-none transition-all focus:bg-white/[0.08]"
+                required
               />
             </div>
-            
+
             {unlockError && (
-              <p className="text-red-400 text-[10px] tracking-wider uppercase font-mono">{unlockError}</p>
+              <motion.div 
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-[11px] text-red-400 font-mono tracking-wider bg-red-500/10 py-2.5 px-4 rounded-xl border border-red-500/10"
+              >
+                {unlockError}
+              </motion.div>
             )}
 
             <button
               type="submit"
-              className="w-full py-3.5 rounded-full bg-gold hover:bg-gold/90 text-black text-xs font-bold tracking-widest uppercase transition-all duration-300 shadow-[0_0_20px_rgba(212,175,55,0.2)] cursor-pointer active:scale-95"
+              className="w-full py-4 rounded-full bg-gold hover:bg-gold/90 text-black text-xs font-black tracking-widest uppercase transition-all duration-300 shadow-[0_4px_20px_rgba(212,175,55,0.15)] cursor-pointer active:scale-98 flex items-center justify-center gap-2"
             >
-              Verify Passcode
+              Unlock Terminal
             </button>
           </form>
         </motion.div>
@@ -271,9 +357,15 @@ export default function AdminPanel({
       {/* Admin Title Banner */}
       <div className="mb-10 text-center md:text-left flex flex-col md:flex-row md:items-end justify-between border-b border-white/10 pb-6 gap-6">
         <div>
-          <div className="flex items-center gap-2 text-[10px] tracking-[0.3em] font-mono text-gold uppercase mb-1">
-            <ShieldCheck className="w-4 h-4 text-gold inline" /> Access Granted • Executive Lounge
-          </div>
+          {currentUser && currentUser.email === 'amitaverma496@gmail.com' ? (
+            <div className="flex items-center gap-2 text-[10px] tracking-[0.25em] font-mono text-emerald-400 p-1.5 px-3 rounded-full bg-emerald-500/10 border border-emerald-500/20 w-fit uppercase mb-2">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 inline" /> Executive Access • Admin Active
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-[10px] tracking-[0.13em] font-mono text-gold p-1.5 px-3 rounded-full bg-gold/10 border border-gold/20 w-fit uppercase mb-2">
+              <KeySquare className="w-3.5 h-3.5 text-gold inline animate-pulse" /> Preview Mode • Click action to Google Sign-In
+            </div>
+          )}
           <h1 className="font-serif text-3xl md:text-4xl text-white tracking-widest uppercase">
             SHUBHAM PANEL
           </h1>
@@ -287,6 +379,10 @@ export default function AdminPanel({
           <div className="glass px-4 py-2.5 rounded-xl border border-white/8 min-w-[100px] text-center">
             <span className="text-[9px] uppercase tracking-widest text-white/40 block">Reservations</span>
             <span className="text-lg font-bold font-mono text-gold">{totalBookings}</span>
+          </div>
+          <div className="glass px-4 py-2.5 rounded-xl border border-white/8 min-w-[100px] text-center">
+            <span className="text-[9px] uppercase tracking-widest text-white/40 block">Total Users</span>
+            <span className="text-lg font-bold font-mono text-[#EAB308]">{dbUsers.length}</span>
           </div>
           <div className="glass px-4 py-2.5 rounded-xl border border-white/8 min-w-[100px] text-center">
             <span className="text-[9px] uppercase tracking-widest text-white/40 block">Unread Msgs</span>
@@ -345,6 +441,26 @@ export default function AdminPanel({
         >
           <MailCheck className="w-3.5 h-3.5" />
           Inquiries ({totalInquiries})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-300 whitespace-nowrap ${
+            activeTab === 'users' ? 'bg-gold text-black' : 'bg-white/5 hover:bg-white/10 text-white/80'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          Registered Users ({dbUsers.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('activity_logs')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-300 whitespace-nowrap ${
+            activeTab === 'activity_logs' ? 'bg-gold text-black' : 'bg-white/5 hover:bg-white/10 text-white/80'
+          }`}
+        >
+          <NotebookTabs className="w-3.5 h-3.5" />
+          Activity Logs ({dbActivityLogs.length})
         </button>
 
 
@@ -1212,7 +1328,223 @@ export default function AdminPanel({
           </div>
         )}
 
+        {/* 5. REGISTERED USERS LIST PANEL */}
+        {activeTab === 'users' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="font-serif text-lg text-gold uppercase tracking-wider">Registered Officers & Guests</h2>
+                <p className="text-white/40 text-[10px] tracking-wider uppercase font-mono mt-0.5">
+                  Total Accounts Registered: {dbUsers.length} • Real-Time Cloud Base
+                </p>
+              </div>
 
+              {/* Search user */}
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-white/40" />
+                <input
+                  type="text"
+                  placeholder="Search user profiles..."
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  className="bg-lux-secondary text-white/90 border border-white/10 px-9 py-2 rounded-lg text-xs placeholder:text-white/30 outline-none w-64 focus:border-gold transition-colors duration-250 font-sans"
+                />
+              </div>
+            </div>
+
+            {filteredUsers.length === 0 ? (
+              <div className="glass text-center py-12 rounded-2xl border border-white/8">
+                <Users className="w-8 h-8 text-white/30 mx-auto mb-3" />
+                <p className="text-sm text-white/40 tracking-wider uppercase font-mono">No registered users matched your query</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Desktop Users Table */}
+                <div className="hidden md:block overflow-x-auto rounded-xl border border-white/10 bg-black/40">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-white/5 text-white/60 tracking-wider uppercase">
+                        <th className="p-4">Officer/User</th>
+                        <th className="p-4">Email Address</th>
+                        <th className="p-4">Google UID</th>
+                        <th className="p-4">Account Created</th>
+                        <th className="p-4">Last Activity</th>
+                        <th className="p-4 text-center">Provider</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-white/80">
+                      {filteredUsers.map(u => (
+                        <tr key={u.uid} className="hover:bg-white/2 transition-colors">
+                          <td className="p-4 flex items-center gap-3">
+                            {u.photoURL ? (
+                              <img 
+                                src={u.photoURL} 
+                                alt={u.displayName} 
+                                className="w-7 h-7 rounded-full border border-gold/30 object-cover" 
+                                referrerPolicy="no-referrer" 
+                              />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-gold/20 flex items-center justify-center text-[10px] text-gold font-bold">
+                                {u.displayName ? u.displayName.charAt(0) : 'U'}
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-serif font-extrabold text-white text-sm block">
+                                {u.displayName || 'Anonymous Guest'}
+                              </span>
+                              {u.email === 'amitaverma496@gmail.com' && (
+                                <span className="text-[8px] bg-gold/20 text-gold border border-gold/30 px-1.5 py-0.5 rounded uppercase font-bold tracking-widest mt-0.5 inline-block">
+                                  Owner/Admin
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 font-mono text-white/70">{u.email}</td>
+                          <td className="p-4 font-mono text-[10px] text-white/50">{u.uid}</td>
+                          <td className="p-4 font-sans text-[11px]">
+                            {new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            <span className="block text-[9px] font-mono text-white/40">
+                              {new Date(u.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          </td>
+                          <td className="p-4 font-sans text-[11px] text-gold">
+                            {new Date(u.lastLoginAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            <span className="block text-[9px] font-mono text-white/40">
+                              {new Date(u.lastLoginAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center font-mono text-[10px]">
+                            <span className="px-2.5 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold uppercase tracking-wider text-[8px]">
+                              {u.provider || 'Google'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile List View */}
+                <div className="block md:hidden space-y-4">
+                  {filteredUsers.map(u => (
+                    <div key={u.uid} className="glass p-4 rounded-2xl border border-white/10 space-y-3 relative overflow-hidden">
+                      <div className="flex items-center gap-3">
+                        {u.photoURL ? (
+                          <img 
+                            src={u.photoURL} 
+                            alt={u.displayName} 
+                            className="w-9 h-9 rounded-full border border-gold/30 object-cover" 
+                            referrerPolicy="no-referrer" 
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center text-xs text-gold font-bold">
+                            {u.displayName ? u.displayName.charAt(0) : 'U'}
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-serif font-extrabold text-white text-sm">
+                            {u.displayName || 'Anonymous Guest'}
+                          </div>
+                          <div className="text-[10px] text-white/50 font-mono">{u.email}</div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-white/5 pt-2 text-[10px] font-mono space-y-1 text-white/70">
+                        <div className="flex justify-between">
+                          <span className="text-white/40 uppercase text-[8px] tracking-wider">UID:</span>
+                          <span className="truncate max-w-[150px]">{u.uid}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/40 uppercase text-[8px] tracking-wider">Created:</span>
+                          <span>{new Date(u.createdAt).toLocaleDateString()} @ {new Date(u.createdAt).toLocaleTimeString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gold/60 uppercase text-[8px] tracking-wider">Last Activity:</span>
+                          <span className="text-gold">{new Date(u.lastLoginAt).toLocaleDateString()} @ {new Date(u.lastLoginAt).toLocaleTimeString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-white/40 uppercase text-[8px] tracking-wider">Provider:</span>
+                          <span className="text-[8px] px-2 py-0.2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full font-bold uppercase tracking-wider">
+                            {u.provider || 'Google'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 6. SYSTEM OPERATIONS & ACTIVITY LOGS PANEL */}
+        {activeTab === 'activity_logs' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="font-serif text-lg text-gold uppercase tracking-wider">Back-of-House System Audit Trails</h2>
+                <p className="text-white/40 text-[10px] tracking-wider uppercase font-mono mt-0.5">
+                  Total Captured Activities: {dbActivityLogs.length} • Real-Time Session Audit
+                </p>
+              </div>
+
+              {/* Search log query */}
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-white/40" />
+                <input
+                  type="text"
+                  placeholder="Filter logs by keyword..."
+                  value={logSearchQuery}
+                  onChange={(e) => setLogSearchQuery(e.target.value)}
+                  className="bg-lux-secondary text-white/90 border border-white/10 px-9 py-2 rounded-lg text-xs placeholder:text-white/30 outline-none w-64 focus:border-gold transition-colors duration-250 font-sans"
+                />
+              </div>
+            </div>
+
+            {filteredLogs.length === 0 ? (
+              <div className="glass text-center py-12 rounded-2xl border border-white/8">
+                <NotebookTabs className="w-8 h-8 text-white/30 mx-auto mb-3" />
+                <p className="text-sm text-white/40 tracking-wider uppercase font-mono">No matching system activity logs found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/40">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/5 text-white/60 tracking-wider uppercase">
+                      <th className="p-4">Action Taken</th>
+                      <th className="p-4">User Name</th>
+                      <th className="p-4">Email Address</th>
+                      <th className="p-4">UID / Actor</th>
+                      <th className="p-4">Logged At (Timestamp)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-mono text-[11px] text-white/85">
+                    {filteredLogs.map(l => (
+                      <tr key={l.id} className="hover:bg-white/2 transition-colors">
+                        <td className="p-4">
+                          <span className={`px-2.5 py-1 rounded border text-[10px] font-bold ${
+                            l.action.includes('Logged In') ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' :
+                            l.action.includes('Booking') || l.action.includes('Pre-order') ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' :
+                            l.action.includes('Inquiry') ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' :
+                            'bg-stone-500/10 text-stone-300 border-stone-500/20'
+                          }`}>
+                            {l.action}
+                          </span>
+                        </td>
+                        <td className="p-4 font-sans font-bold text-white/95">{l.displayName}</td>
+                        <td className="p-4 text-white/70">{l.email}</td>
+                        <td className="p-4 text-white/40 text-[10px]">{l.uid}</td>
+                        <td className="p-4 font-sans text-white/70">
+                          {new Date(l.timestamp).toLocaleDateString()} @ {new Date(l.timestamp).toLocaleTimeString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
 

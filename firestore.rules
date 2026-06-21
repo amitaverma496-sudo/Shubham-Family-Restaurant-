@@ -11,6 +11,22 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // Admin authorization rule checking for either bootstrapped email or an explicit admin document
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'amitaverma496@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
     function isValidBooking(data) {
       return data.id is string && data.id.size() <= 128
         && data.name is string && data.name.size() <= 128
@@ -28,24 +44,77 @@ service cloud.firestore {
     function isValidUser(data) {
       return data.uid is string && data.uid.size() <= 256
         && data.email is string && data.email.size() <= 256
-        && data.lastLogin is string && data.lastLogin.size() <= 128
+        && data.lastLoginAt is string && data.lastLoginAt.size() <= 128
+        && data.createdAt is string && data.createdAt.size() <= 128
         && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 256))
-        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 4096));
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 4096))
+        && (!('provider' in data) || (data.provider is string && data.provider.size() <= 128))
+        && (!('role' in data) || (data.role is string && data.role.size() <= 64)); // Prevent self-elevating roles
     }
 
-    // Bookings collection – accessible by anyone to place pre-orders and check in real time.
+    function isValidLog(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.uid is string && data.uid.size() <= 256
+        && data.email is string && data.email.size() <= 256
+        && data.action is string && data.action.size() <= 512
+        && data.timestamp is string && data.timestamp.size() <= 128
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 256));
+    }
+
+    function isValidReview(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 128
+        && (data.rating is int || data.rating is float) && data.rating >= 1 && data.rating <= 5
+        && data.comment is string && data.comment.size() <= 2048
+        && data.date is string && data.date.size() <= 64
+        && data.avatar is string && data.avatar.size() <= 4096;
+    }
+
+    function isValidInquiry(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 128
+        && data.phone is string && data.phone.size() <= 64
+        && data.message is string && data.message.size() <= 2048
+        && data.status is string && (data.status == 'Replied' || data.status == 'Unread')
+        && data.createdAt is string && data.createdAt.size() <= 64;
+    }
+
+    // Bookings collection
     match /bookings/{bookingId} {
-      allow read: if true;
-      allow create: if isValidId(bookingId) && isValidBooking(request.resource.data);
-      allow update: if isValidId(bookingId) && isValidBooking(request.resource.data);
-      allow delete: if isValidId(bookingId);
+      allow read: if isVerifiedUser();
+      allow create: if isValidId(bookingId) && isVerifiedUser() && isValidBooking(request.resource.data);
+      allow update: if isValidId(bookingId) && (isAdmin() || (isVerifiedUser() && isValidBooking(request.resource.data)));
+      allow delete: if isAdmin();
     }
 
     // Users collection – user profiles from Google Sign-In.
     match /users/{userId} {
-      allow read: if true;
-      allow create, update: if isValidId(userId) && request.auth != null && request.auth.uid == userId && isValidUser(request.resource.data);
-      allow delete: if false;
+      allow read: if isAdmin() || (isVerifiedUser() && request.auth.uid == userId);
+      allow create: if isValidId(userId) && isVerifiedUser() && request.auth.uid == userId && isValidUser(request.resource.data) && !('role' in request.resource.data);
+      allow update: if isValidId(userId) && (isAdmin() || (isVerifiedUser() && request.auth.uid == userId && isValidUser(request.resource.data) && (!('role' in request.resource.data) || request.resource.data.role == resource.data.role)));
+      allow delete: if isAdmin();
+    }
+
+    // ActivityLogs collection - User action tracking audits
+    match /activityLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isValidId(logId) && isVerifiedUser() && request.resource.data.uid == request.auth.uid && isValidLog(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    // Reviews collection – testimonials visible to verified users and created by verified users.
+    match /reviews/{reviewId} {
+      allow read: if isVerifiedUser();
+      allow create: if isValidId(reviewId) && isVerifiedUser() && isValidReview(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    // Inquiries collection – contact forms, only readable by admins.
+    match /inquiries/{inquiryId} {
+      allow read: if isAdmin();
+      allow create: if isValidId(inquiryId) && isVerifiedUser() && isValidInquiry(request.resource.data);
+      allow update: if isValidId(inquiryId) && isAdmin() && isValidInquiry(request.resource.data);
+      allow delete: if isAdmin();
     }
   }
 }
