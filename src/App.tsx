@@ -33,6 +33,7 @@ import { HeroScrollDemo } from '@/components/ui/demo';
 import { HeroSectionDemo } from './components/blocks/demo';
 import NeuralBackground from '@/components/ui/flow-field-background';
 import Futuristic3DHologram from '@/components/ui/hero-futuristic';
+import { SpiralAnimation } from '@/components/ui/spiral-animation';
 
 // Image paths generated earlier
 const INTERIOR_URL = 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=1200';
@@ -447,6 +448,15 @@ export default function App() {
                 speed={0.35} 
                 scale={1}
               />
+            </div>
+
+            {/* 3D Spiral Background Animation - Visible everywhere except Hero section (active after scrollY > 300) */}
+            <div 
+              className={`fixed inset-0 w-full h-full z-0 pointer-events-none transition-opacity duration-1000 ${
+                scrollY > 300 ? 'opacity-80' : 'opacity-0'
+              }`}
+            >
+              <SpiralAnimation color="#D4AF37" />
             </div>
 
             {/* HER0 DISPLAY LANDING CANVAS */}
