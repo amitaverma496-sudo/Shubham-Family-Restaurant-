@@ -156,7 +156,7 @@ class AnimationController {
     }
     
     // 投影点
-    public showProjectedDot(position: Vector3D, sizeFactor: number) {
+    public showProjectedDot(position: Vector3D, sizeFactor: number, fillStyle?: string) {
         const t2 = this.constrain(this.map(this.time, this.changeEventTime, 1, 0, 1), 0, 1)
         const newCameraZ = this.cameraZ + this.ease(Math.pow(t2, 1.2), 1.8) * this.cameraTravelDistance
         
@@ -168,6 +168,11 @@ class AnimationController {
             const y = this.viewZoom * position.y / dotDepthFromCamera
             const sw = 400 * sizeFactor / dotDepthFromCamera
             
+            if (fillStyle) {
+                this.ctx.fillStyle = fillStyle
+            } else {
+                this.ctx.fillStyle = this.color
+            }
             this.ctx.lineWidth = sw
             this.ctx.beginPath()
             this.ctx.arc(x, y, 0.5, 0, Math.PI * 2)
@@ -180,7 +185,8 @@ class AnimationController {
         if (this.time > this.changeEventTime) {
             const dy = this.cameraZ * this.startDotYOffset / this.viewZoom
             const position = new Vector3D(0, dy, this.cameraTravelDistance)
-            this.showProjectedDot(position, 2.5)
+            const startDotHue = (this.time * 360) % 360
+            this.showProjectedDot(position, 2.5, `hsla(${startDotHue}, 98%, 78%, 1)`)
         }
     }
     
@@ -204,8 +210,7 @@ class AnimationController {
         // 绘制轨迹
         this.drawTrail(t1)
         
-                // 绘制星星
-        ctx.fillStyle = this.color
+        // 绘制星星 - Each star will set its own dynamic fill style
         for (const star of this.stars) {
             star.render(t1, this)
         }
@@ -222,10 +227,11 @@ class AnimationController {
             const f = this.map(i, 0, this.trailLength, 1.1, 0.1)
             const sw = (1.3 * (1 - t1) + 3.0 * Math.sin(Math.PI * t1)) * f
             
-            this.ctx.fillStyle = this.color
+            const pathTime = t1 - 0.00015 * i
+            const trailHue = (pathTime * 360 + (this.time * 720)) % 360
+            this.ctx.fillStyle = `hsla(${trailHue}, 98%, 70%, 0.95)`
             this.ctx.lineWidth = sw
             
-            const pathTime = t1 - 0.00015 * i
             const position = this.spiralPath(pathTime)
             
             // 添加旋转效果
@@ -384,7 +390,11 @@ class Star {
             
             const dotSize = 8.5 * this.strokeWeightFactor * sizeMultiplier;
             
-            controller.showProjectedDot(position, dotSize);
+            // Calculate a beautiful dynamic colorful hue based on angle * spiralLocation and time
+            const starHue = (this.angle * 180 / Math.PI + (controller['time'] * 360) + this.spiralLocation * 120) % 360;
+            const starColor = `hsla(${starHue}, 95%, 72%, 0.95)`;
+            
+            controller.showProjectedDot(position, dotSize, starColor);
         }
     }
 }

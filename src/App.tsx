@@ -29,6 +29,7 @@ import Reviews from './components/Reviews';
 import GalleryLightbox from './components/GalleryLightbox';
 import InteractiveMap from './components/InteractiveMap';
 import LiquidButton from './components/LiquidButton';
+import { Button } from '@/components/ui/neon-button';
 import { HeroScrollDemo } from '@/components/ui/demo';
 import { HeroSectionDemo } from './components/blocks/demo';
 import NeuralBackground from '@/components/ui/flow-field-background';
@@ -904,12 +905,14 @@ export default function App() {
                           onChange={(e) => setContactForm(prev => ({ ...prev, message: e.target.value }))}
                           className="w-full bg-black/50 border border-white/12 text-white px-4 py-2.5 rounded-xl outline-none focus:border-gold transition-colors placeholder:text-white/20 resize-none font-sans leading-relaxed"
                         />
-                        <button
+                        <Button
+                          neon={true}
+                          variant="solid"
                           type="submit"
-                          className="w-full py-2.5 rounded-full bg-gold hover:bg-gold/90 text-black text-[11px] font-bold tracking-widest uppercase transition-all duration-300"
+                          className="w-full py-2.5 text-black hover:text-white border-gold/40 text-[11px] font-bold tracking-widest uppercase mt-2 select-none"
                         >
                           <Send className="w-3 h-3 inline mr-1.5" /> Forward note to desk
-                        </button>
+                        </Button>
                       </form>
                     </div>
 
@@ -1126,7 +1129,9 @@ export default function App() {
                 </div>
 
                 {/* Right Side: Primary book action CTA button */}
-                <button
+                <Button
+                  neon={true}
+                  variant="solid"
                   onClick={() => {
                     const dishStrings = selectedDishesForBooking.map(item => `${item.name} (x${item.quantity})`).join(', ');
                     setPreOrderForm({
@@ -1141,11 +1146,11 @@ export default function App() {
                     setPreOrderTicket(null);
                     setIsPreOrderPopupOpen(true);
                   }}
-                  className="px-5 py-3 rounded-xl bg-gold hover:bg-gold/90 text-black text-[11px] font-extrabold tracking-widest uppercase transition-all shadow-[0_0_20px_rgba(212,175,55,0.35)] active:scale-95 flex items-center gap-1.5 cursor-pointer hover:shadow-[0_0_25px_rgba(212,175,55,0.5)]"
+                  className="px-5 py-3 text-black hover:text-white border-gold/40 text-[11px] font-extrabold tracking-widest uppercase flex items-center gap-1.5 cursor-pointer select-none"
                 >
                   <span>Book & Pre-Order</span>
-                  <div className="w-1.5 h-1.5 rounded-full bg-black animate-ping" />
-                </button>
+                  <div className="w-1.5 h-1.5 rounded-full bg-black hover:bg-white animate-ping" />
+                </Button>
 
               </div>
 
@@ -1428,12 +1433,14 @@ export default function App() {
                   </div>
 
                   {/* Submit Button */}
-                  <button
+                  <Button
+                    neon={true}
+                    variant="solid"
                     type="submit"
-                    className="w-full py-3.5 rounded-full bg-gold hover:bg-gold/90 text-black text-[11px] font-extrabold tracking-widest uppercase transition-all shadow-[0_5px_22px_rgba(212,175,55,0.2)] hover:shadow-[0_8px_30px_rgba(212,175,55,0.35)] cursor-pointer mt-4"
+                    className="w-full py-3.5 text-black hover:text-white border-gold/40 text-[11px] font-extrabold tracking-widest uppercase cursor-pointer mt-4 select-none"
                   >
                     Confirm & Submit Royal Pre-Order
-                  </button>
+                  </Button>
                 </form>
               ) : (
                 /* --- CELEBRATION CONFIRMED SCREEN --- */

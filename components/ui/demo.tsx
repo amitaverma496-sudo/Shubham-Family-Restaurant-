@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
 import NeuralBackground from "@/components/ui/flow-field-background";
 import { SpiralAnimation } from "@/components/ui/spiral-animation";
+import { SparklesText } from "@/components/ui/sparkles-text";
+import { Button } from "@/components/ui/neon-button";
 
 export function HeroScrollDemo() {
   return (
@@ -105,5 +107,42 @@ export const SpiralDemo = () => {
     </div>
   )
 }
+
+export function SparklesTextDemo() {
+  return <SparklesText text="Magic UI" />;
+}
+
+export const Default = () => {
+    return (
+        <>
+            <div className="flex flex-col gap-3">
+                <Button>Button</Button>
+                <WithNoNeon />
+                <Solid />
+            </div>
+        </>
+    )
+}
+
+export const WithNoNeon = () => {
+    return (
+        <>
+            <div className="flex flex-col gap-2">
+                <Button neon={false}>normal button</Button>
+            </div>
+        </>
+    )
+}
+
+export const Solid = () => {
+    return (
+        <>
+            <div className="flex flex-col gap-2">
+                <Button variant={"solid"}>solid</Button>
+            </div>
+        </>
+    )
+}
+
 
 
