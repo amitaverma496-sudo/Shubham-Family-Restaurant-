@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import { gsap } from 'gsap'
 
 // 向量工具类
@@ -36,7 +36,7 @@ class AnimationController {
     private readonly cameraTravelDistance = 3400
     private readonly startDotYOffset = 28
     private readonly viewZoom = 100
-    private readonly numberOfStars = 5000
+    private readonly numberOfStars = 1500
     private readonly trailLength = 80
     
     constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, dpr: number, size: number, color?: string) {
@@ -49,7 +49,7 @@ class AnimationController {
         
         // 初始化
         this.setupRandomGenerator()
-        this.createStars()
+        // Removed duplicate createStars call here as setupRandomGenerator() already populates deterministic stars
         this.setupTimeline()
     }
     
@@ -389,23 +389,30 @@ class Star {
     }
 }
 
-export function SpiralAnimation({ color = '#D4AF37' }: { color?: string } = {}) {
+export const SpiralAnimation = memo(function SpiralAnimation({ color = '#D4AF37' }: { color?: string } = {}) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const animationRef = useRef<AnimationController | null>(null)
     const [dimensions, setDimensions] = useState({ width: typeof window !== 'undefined' ? window.innerWidth : 800, height: typeof window !== 'undefined' ? window.innerHeight : 600 })
     
-    // 处理窗口大小变化
+    // 处理窗口大小变化 - 增加了简单的防抖来减少重复的canvas创建
     useEffect(() => {
+        let timeoutId: any;
         const handleResize = () => {
-            setDimensions({
-                width: window.innerWidth,
-                height: window.innerHeight
-            })
+            clearTimeout(timeoutId)
+            timeoutId = setTimeout(() => {
+                setDimensions({
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                })
+            }, 100)
         }
         
         handleResize()
         window.addEventListener('resize', handleResize)
-        return () => window.removeEventListener('resize', handleResize)
+        return () => {
+            window.removeEventListener('resize', handleResize)
+            clearTimeout(timeoutId)
+        }
     }, [])
     
     // 创建和管理动画
@@ -416,8 +423,8 @@ export function SpiralAnimation({ color = '#D4AF37' }: { color?: string } = {}) 
         const ctx = canvas.getContext('2d')
         if (!ctx) return
         
-        // 处理DPR以解决模糊问题
-        const dpr = window.devicePixelRatio || 1
+        // 限制最大DPR为1.5或2以极大地提升渲染性能，且视觉无差别
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
         // 使用全屏尺寸
         const size = Math.max(dimensions.width, dimensions.height)
         
@@ -451,4 +458,4 @@ export function SpiralAnimation({ color = '#D4AF37' }: { color?: string } = {}) 
             />
         </div>
     )
-}
+})
