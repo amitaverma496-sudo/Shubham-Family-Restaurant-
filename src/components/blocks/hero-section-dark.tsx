@@ -1,6 +1,141 @@
 import * as React from "react"
 import { cn } from "../../lib/utils"
 import { ChevronRight } from "lucide-react"
+import { motion, useMotionValue, useSpring, useTransform } from "motion/react"
+
+interface Interactive3DTextProps {
+  regularText: string;
+  gradientText: string;
+}
+
+const Interactive3DText: React.FC<Interactive3DTextProps> = ({ regularText, gradientText }) => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  
+  const springConfig = { damping: 25, stiffness: 140, mass: 1 };
+  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [18, -18]), springConfig);
+  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-18, 18]), springConfig);
+  
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    
+    const relativeX = (e.clientX - rect.left) / width - 0.5;
+    const relativeY = (e.clientY - rect.top) / height - 0.5;
+    
+    x.set(relativeX);
+    y.set(relativeY);
+  };
+  
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  const wordVariants = {
+    hidden: { opacity: 0, y: 50, rotateX: -75, scale: 0.9, z: -100 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      rotateX: 0,
+      scale: 1,
+      z: 0,
+      transition: {
+        type: "spring" as const,
+        damping: 14,
+        stiffness: 90,
+        duration: 0.8
+      }
+    }
+  };
+
+  const containerVariants = {
+    hidden: {},
+    visible: {
+      transition: {
+        staggerChildren: 0.05
+      }
+    }
+  };
+
+  const words = regularText.split(" ");
+
+  return (
+    <div
+      ref={containerRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className="relative cursor-pointer select-none [perspective:1200px] py-4 w-full"
+    >
+      <motion.div
+        style={{
+          rotateX,
+          rotateY,
+          transformStyle: "preserve-3d",
+        }}
+        className="w-full h-full relative"
+      >
+        {/* Shadow layer for depth */}
+        <div
+          style={{
+            transform: "translateZ(-30px)",
+            filter: "blur(12px)",
+          }}
+          className="absolute inset-0 text-3xl sm:text-5xl font-serif font-extrabold tracking-tight text-black/40 select-none pointer-events-none flex flex-col items-center justify-center text-center leading-none"
+        >
+          <span>{regularText}</span>
+          <span className="block mt-2">{gradientText}</span>
+        </div>
+
+        {/* Core Foreground Interactive Text */}
+        <motion.h2
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          style={{
+            transformStyle: "preserve-3d",
+            transform: "translateZ(40px)",
+          }}
+          className="text-3xl sm:text-5xl font-serif font-extrabold tracking-tight mx-auto md:text-7xl leading-tight text-white text-center"
+        >
+          {/* Main regular words */}
+          <span 
+            style={{ transformStyle: "preserve-3d" }}
+            className="bg-clip-text text-transparent bg-[linear-gradient(180deg,_#FFF_0%,_rgba(255,_255,_255,_0.3)_200%)] dark:bg-[linear-gradient(180deg,_#FFF_0%,_rgba(255,_255,_255,_0.40)_202.08%)] flex flex-wrap justify-center gap-x-3 gap-y-1"
+          >
+            {words.map((word, i) => (
+              <motion.span
+                key={i}
+                variants={wordVariants}
+                className="inline-block origin-bottom [transform-style:preserve-3d]"
+              >
+                {word}
+              </motion.span>
+            ))}
+          </span>
+
+          {/* Subtitle/gradient line */}
+          <motion.span
+            initial={{ opacity: 0, scale: 0.85, rotateX: 60, y: 30 }}
+            animate={{ opacity: 1, scale: 1, rotateX: 0, y: 0 }}
+            transition={{ delay: 0.35, type: "spring" as const, stiffness: 95, damping: 13 }}
+            style={{ 
+              transformStyle: "preserve-3d",
+              transform: "translateZ(65px)",
+            }}
+            className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-teal-300 dark:from-blue-400 dark:to-teal-300 block mt-3 drop-shadow-[0_5px_15px_rgba(59,130,246,0.25)] font-serif italic"
+          >
+            {gradientText}
+          </motion.span>
+        </motion.h2>
+      </motion.div>
+    </div>
+  );
+};
 
 interface HeroSectionProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string
@@ -87,12 +222,10 @@ const HeroSection = React.forwardRef<HTMLDivElement, HeroSectionProps>(
                 {title}
                 <ChevronRight className="inline w-4 h-4 ml-1 group-hover:translate-x-1 duration-300" />
               </h1>
-              <h2 className="text-3xl sm:text-5xl font-serif font-extrabold tracking-tight bg-clip-text text-transparent mx-auto md:text-7xl bg-[linear-gradient(180deg,_#FFF_0%,_rgba(255,_255,_255,_0.1)_200%)] dark:bg-[linear-gradient(180deg,_#FFF_0%,_rgba(255,_255,_255,_0.30)_202.08%)] text-white">
-                {subtitle.regular}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-300 dark:from-blue-400 dark:to-teal-300 block mt-2">
-                  {subtitle.gradient}
-                </span>
-              </h2>
+              <Interactive3DText 
+                regularText={subtitle.regular} 
+                gradientText={subtitle.gradient} 
+              />
               <p className="max-w-2xl mx-auto text-gray-400 text-xs md:text-sm tracking-wide uppercase font-mono">
                 {description}
               </p>

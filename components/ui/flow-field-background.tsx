@@ -169,39 +169,42 @@ export default function NeuralBackground({
         if (this.history.length < 2) return;
 
         const ageAlpha = 1 - Math.abs((this.age / this.life) - 0.5) * 2;
+        const head = this.history[0];
          
-        // Draw elegant connecting trail lines in 3D perspective depth space
-        for (let i = 0; i < this.history.length - 1; i++) {
-          const p1 = this.history[i];
-          const p2 = this.history[i + 1];
-
-          // Skip drawing if wraparound triggered a boundary gap
-          if (Math.abs(p1.px - p2.px) > width * 0.5 || Math.abs(p1.py - p2.py) > height * 0.5) {
-            continue;
+        // Draw elegant connecting trail lines in 3D perspective depth space in a single contiguous stroke!
+        context.beginPath();
+        let first = true;
+        
+        for (let i = 0; i < this.history.length; i++) {
+          const pt = this.history[i];
+          if (first) {
+            context.moveTo(pt.px, pt.py);
+            first = false;
+          } else {
+            const prev = this.history[i - 1];
+            // Skip drawing if wraparound triggered a boundary gap
+            if (Math.abs(pt.px - prev.px) > width * 0.5 || Math.abs(pt.py - prev.py) > height * 0.5) {
+              context.stroke();
+              context.beginPath();
+              context.moveTo(pt.px, pt.py);
+            } else {
+              context.lineTo(pt.px, pt.py);
+            }
           }
-
-          context.beginPath();
-          context.moveTo(p1.px, p1.py);
-          context.lineTo(p2.px, p2.py);
-
-          // Fades out down the tail length, weighted by 3D depth scaleZ
-          const trailAlpha = (1 - (i / this.history.length)) * 0.7 * ageAlpha * p1.scaleZ;
-          context.strokeStyle = activeColor;
-          context.globalAlpha = Math.max(0, Math.min(1, trailAlpha));
-          
-          // Render thicker lines for elements physically closer, thinner for distant elements (authentic 3D feel!)
-          context.lineWidth = 1.3 * scale * p1.scaleZ;
-          context.stroke();
         }
 
-        // Highlight head particle in projected space
-        const head = this.history[0];
+        const alpha = 0.3 * ageAlpha * head.scaleZ;
+        context.strokeStyle = activeColor;
+        context.globalAlpha = Math.max(0, Math.min(1, alpha));
+        context.lineWidth = 1.1 * scale * head.scaleZ;
+        context.stroke();
+
+        // Highlight head particle in projected space using flat rectangle instead of costly arc
         if (head) {
-          context.beginPath();
-          context.arc(head.px, head.py, 1.4 * scale * head.scaleZ, 0, Math.PI * 2);
+          const hSize = Math.max(1, 2.2 * scale * head.scaleZ);
           context.fillStyle = activeColor;
           context.globalAlpha = Math.max(0, Math.min(1, ageAlpha * 0.95 * head.scaleZ));
-          context.fill();
+          context.fillRect(head.px - hSize / 2, head.py - hSize / 2, hSize, hSize);
         }
       }
     }

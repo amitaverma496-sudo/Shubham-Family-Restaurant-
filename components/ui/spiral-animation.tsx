@@ -36,7 +36,7 @@ class AnimationController {
     private readonly cameraTravelDistance = 3400
     private readonly startDotYOffset = 28
     private readonly viewZoom = 100
-    private readonly numberOfStars = 1500
+    private readonly numberOfStars = 350
     private readonly trailLength = 80
     
     constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, dpr: number, size: number, color?: string) {
@@ -173,10 +173,10 @@ class AnimationController {
             } else {
                 this.ctx.fillStyle = this.color
             }
-            this.ctx.lineWidth = sw
-            this.ctx.beginPath()
-            this.ctx.arc(x, y, 0.5, 0, Math.PI * 2)
-            this.ctx.fill()
+            
+            // Draw an optimized 3D perspective sized square instead of costly circles
+            const size = Math.max(1.0, sw)
+            this.ctx.fillRect(x - size / 2, y - size / 2, size, size)
         }
     }
     
@@ -230,7 +230,6 @@ class AnimationController {
             const pathTime = t1 - 0.00015 * i
             const trailHue = (pathTime * 360 + (this.time * 720)) % 360
             this.ctx.fillStyle = `hsla(${trailHue}, 98%, 70%, 0.95)`
-            this.ctx.lineWidth = sw
             
             const position = this.spiralPath(pathTime)
             
@@ -244,9 +243,8 @@ class AnimationController {
                 i % 2 === 0
             )
             
-            this.ctx.beginPath()
-            this.ctx.arc(rotated.x, rotated.y, sw / 2, 0, Math.PI * 2)
-            this.ctx.fill()
+            const size = Math.max(1.0, sw)
+            this.ctx.fillRect(rotated.x - size / 2, rotated.y - size / 2, size, size)
         }
     }
     

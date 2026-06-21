@@ -150,9 +150,14 @@ export default function App() {
   });
   const [contactSuccess, setContactSuccess] = useState('');
 
-  // Floating mouse coordinates for reactive 3D parallax gold lighting
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  // DOM refs to animate without React triggers (Butter-smooth, 120fps GPU performance)
   const containerRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const torchRef = useRef<HTMLDivElement>(null);
+  const globalBgRef = useRef<HTMLDivElement>(null);
+
+  // State condition only updates when crossing the 300px threshold to trigger loading/unloading of backgrounds
+  const [isPastThreshold, setIsPastThreshold] = useState(false);
 
   // --- INITIAL COMPONENT MOUNT LOADING EFFECT ---
   useEffect(() => {
@@ -162,24 +167,39 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Monitor mouse motion over hero for high-end cinematic light flare
+  // Butter-smooth real-time mouse follow without triggering React re-renders
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setMousePos({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      });
+    if (heroRef.current && torchRef.current) {
+      const rect = heroRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left - 300;
+      const y = e.clientY - rect.top - 300;
+      // Using GPU-accelerated transform instead of top/left layout paints
+      torchRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
     }
   };
 
-  // Parallax scroll state
-  const [scrollY, setScrollY] = useState(0);
+  // Butter-smooth real-time scroll parallax without triggering React re-renders
   useEffect(() => {
     const handleScroll = () => {
-      setScrollY(window.scrollY);
+      const currentScrollY = window.scrollY;
+
+      // Update parallax on global background div directly via DOM ref
+      if (globalBgRef.current) {
+        globalBgRef.current.style.transform = `translate3d(0, ${currentScrollY * -0.15}px, 0)`;
+      }
+
+      // Check boundary threshold and update React state only on transition crossings
+      const past = currentScrollY > 300;
+      setIsPastThreshold(prev => {
+        if (prev !== past) {
+          return past;
+        }
+        return prev;
+      });
     };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Execute once initially
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -349,7 +369,7 @@ export default function App() {
   };
 
   return (
-    <div ref={containerRef} onMouseMove={handleMouseMove} className="selection:bg-gold selection:text-black min-h-screen bg-lux-black relative overflow-x-hidden w-full max-w-full">
+    <div ref={containerRef} className="selection:bg-gold selection:text-black min-h-screen bg-lux-black relative overflow-x-hidden w-full max-w-full">
       
       {/* 1. CINEMATIC LUXURY CARD LOADING SCREEN */}
       <AnimatePresence>
@@ -439,51 +459,60 @@ export default function App() {
             
             {/* Global Subtle Parallax 3D background animation across the website, performance optimized */}
             <div 
-              className="fixed inset-0 w-full h-full z-0 opacity-[0.08] pointer-events-none blur-[1px] transition-transform duration-75 ease-out"
-              style={{ transform: `translateY(${scrollY * -0.15}px)` }}
+              ref={globalBgRef}
+              className="fixed inset-0 w-full h-full z-0 opacity-[0.08] pointer-events-none blur-[1px]"
+              style={{ transform: 'translate3d(0, 0, 0)' }}
             >
-              <NeuralBackground 
-                color="#D4AF37"
-                trailOpacity={0.16} 
-                particleCount={180} 
-                speed={0.35} 
-                scale={1}
-              />
+              {isPastThreshold && (
+                <NeuralBackground 
+                  color="#D4AF37"
+                  trailOpacity={0.16} 
+                  particleCount={120} 
+                  speed={0.35} 
+                  scale={1}
+                />
+              )}
             </div>
 
             {/* 3D Spiral Background Animation - Visible everywhere except Hero section (active after scrollY > 300) */}
-            <div 
-              className={`fixed inset-0 w-full h-full z-0 pointer-events-none transition-opacity duration-1000 ${
-                scrollY > 300 ? 'opacity-80' : 'opacity-0'
-              }`}
-            >
-              <SpiralAnimation color="#D4AF37" />
-            </div>
+            {isPastThreshold && (
+              <div className="fixed inset-0 w-full h-full z-0 pointer-events-none opacity-80 animate-fadeIn animate-duration-500">
+                <SpiralAnimation color="#D4AF37" />
+              </div>
+            )}
 
             {/* HER0 DISPLAY LANDING CANVAS */}
-            <header id="home" className="relative min-h-screen flex flex-col items-center justify-center pt-32 pb-44 px-4 sm:px-6 select-none overflow-hidden z-10">
+            <header 
+              id="home" 
+              ref={heroRef}
+              onMouseMove={handleMouseMove}
+              className="relative min-h-screen flex flex-col items-center justify-center pt-32 pb-44 px-4 sm:px-6 select-none overflow-hidden z-10"
+            >
               
               {/* Pure luxurious black background */}
               <div className="absolute inset-0 bg-[#0a0a0a] w-full h-full" />
 
               {/* Dynamic Interactive Flow-Field Neural Background (Multi-hue Micro-Fluid 3D Systems) */}
               <div className="absolute inset-0 w-full h-full z-[1] opacity-80 mix-blend-screen pointer-events-none font-sans">
-                <NeuralBackground 
-                  trailOpacity={0.15} 
-                  particleCount={300} 
-                  speed={0.6} 
-                  scale={1.3}
-                />
+                {!isPastThreshold && (
+                  <NeuralBackground 
+                    trailOpacity={0.15} 
+                    particleCount={150} 
+                    speed={0.6} 
+                    scale={1.3}
+                  />
+                )}
               </div>
 
               {/* Reactive Gold Torch Flare mapping mouse movement */}
               <div 
-                className="absolute pointer-events-none w-[600px] h-[600px] rounded-full mix-blend-screen opacity-15 blur-[120px]"
+                ref={torchRef}
+                className="absolute pointer-events-none w-[600px] h-[600px] rounded-full mix-blend-screen opacity-15 blur-[120px] bg-[radial-gradient(circle,_rgba(212,175,55,0.2)_0%,_transparent_70%)]"
                 style={{
-                  background: 'radial-gradient(circle, rgba(212,175,55,0.2) 0%, transparent 70%)',
-                  left: mousePos.x - 300,
-                  top: mousePos.y - 300,
-                  transition: 'left 0.15s ease-out, top 0.15s ease-out'
+                  left: 0,
+                  top: 0,
+                  transform: 'translate3d(-300px, -300px, 0)',
+                  transition: 'transform 0.1s ease-out'
                 }}
               />
 
