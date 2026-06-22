@@ -13,7 +13,7 @@ import { MenuItem, Booking, GalleryItem, Inquiry, UserProfile, ActivityLog } fro
 // Import Firestore database sync and Auth support
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db, auth, googleProvider, handleFirestoreError, OperationType } from './firebase';
-import { onAuthStateChanged, signInWithRedirect, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 
 // Import Seed Data
 import { 
@@ -97,8 +97,22 @@ export default function App() {
     }
   };
 
-  // Listen to Auth State
+  // Listen to Auth State and Google Redirect Sign-In results
   useEffect(() => {
+    const handleRedirectAndAuth = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          const user = result.user;
+          await updateOrCreateUserProfile(user);
+          await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Redirect");
+        }
+      } catch (err) {
+        console.error("Redirect Authentication Error:", err);
+      }
+    };
+    handleRedirectAndAuth();
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setCurrentUser(user);
@@ -119,14 +133,9 @@ export default function App() {
   const handleSignIn = async (): Promise<any> => {
     setIsLoadingAuth(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      await updateOrCreateUserProfile(user);
-      await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Sign-In");
-      return user;
+      await signInWithRedirect(auth, googleProvider);
     } catch (err) {
       console.error("Authentication Error:", err);
-    } finally {
       setIsLoadingAuth(false);
     }
   };
