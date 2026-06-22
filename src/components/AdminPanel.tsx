@@ -18,8 +18,6 @@ interface AdminPanelProps {
   setGalleryItems: React.Dispatch<React.SetStateAction<GalleryItem[]>>;
   inquiries: Inquiry[];
   setInquiries: React.Dispatch<React.SetStateAction<Inquiry[]>>;
-  currentUser: any;
-  onSignIn: () => Promise<any>;
 }
 
 type TabType = 'table_bookings' | 'preorders' | 'menu' | 'gallery' | 'inquiries' | 'users' | 'activity_logs';
@@ -28,8 +26,7 @@ export default function AdminPanel({
   bookings, setBookings,
   menuItems, setMenuItems,
   galleryItems, setGalleryItems,
-  inquiries, setInquiries,
-  currentUser, onSignIn
+  inquiries, setInquiries
 }: AdminPanelProps) {
   const [password, setPassword] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -61,7 +58,7 @@ export default function AdminPanel({
   const [logSearchQuery, setLogSearchQuery] = useState('');
 
   useEffect(() => {
-    if (!currentUser || currentUser.email !== 'amitaverma496@gmail.com') return;
+    if (!isUnlocked) return;
     
     // Listen to users collection in Firestore
     const usersQuery = query(collection(db, 'users'), orderBy('lastLoginAt', 'desc'));
@@ -91,7 +88,7 @@ export default function AdminPanel({
       unsubscribeUsers();
       unsubscribeLogs();
     };
-  }, [currentUser]);
+  }, [isUnlocked]);
 
   // Derived filter states
   const filteredUsers = dbUsers.filter(u => {
@@ -357,15 +354,9 @@ export default function AdminPanel({
       {/* Admin Title Banner */}
       <div className="mb-10 text-center md:text-left flex flex-col md:flex-row md:items-end justify-between border-b border-white/10 pb-6 gap-6">
         <div>
-          {currentUser && currentUser.email === 'amitaverma496@gmail.com' ? (
-            <div className="flex items-center gap-2 text-[10px] tracking-[0.25em] font-mono text-emerald-400 p-1.5 px-3 rounded-full bg-emerald-500/10 border border-emerald-500/20 w-fit uppercase mb-2">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 inline" /> Executive Access • Admin Active
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-[10px] tracking-[0.13em] font-mono text-gold p-1.5 px-3 rounded-full bg-gold/10 border border-gold/20 w-fit uppercase mb-2">
-              <KeySquare className="w-3.5 h-3.5 text-gold inline animate-pulse" /> Preview Mode • Click action to Google Sign-In
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-[10px] tracking-[0.25em] font-mono text-emerald-400 p-1.5 px-3 rounded-full bg-emerald-500/10 border border-emerald-500/20 w-fit uppercase mb-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 inline" /> Executive Access • Admin Active
+          </div>
           <h1 className="font-serif text-3xl md:text-4xl text-white tracking-widest uppercase">
             SHUBHAM PANEL
           </h1>
