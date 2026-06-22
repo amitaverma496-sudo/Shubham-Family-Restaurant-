@@ -13,7 +13,7 @@ import { MenuItem, Booking, GalleryItem, Inquiry, UserProfile, ActivityLog } fro
 // Import Firestore database sync and Auth support
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db, auth, googleProvider, handleFirestoreError, OperationType } from './firebase';
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithRedirect, signOut } from 'firebase/auth';
 
 // Import Seed Data
 import { 
