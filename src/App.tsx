@@ -228,15 +228,19 @@ export default function App() {
         setIsLoadingAuth(false);
         return user;
       } catch (err: any) {
-        console.error("[SignIn Error] signInWithPopup encountered error code:", err.code, "Full details:", err);
         setIsLoadingAuth(false);
+        
+        if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+          console.log("[SignIn Info] User closed or cancelled the login popup window.");
+          return null;
+        }
+
+        console.error("[SignIn Error] signInWithPopup encountered error:", err.code || err.message, err);
         
         // Blockers/Restrictions Fallback to Redirect configuration
         if (
           err.code === 'auth/popup-blocked' || 
-          err.code === 'auth/cancelled-popup-request' || 
           err.code === 'auth/iframe-start-failed' ||
-          err.code === 'auth/popup-closed-by-user' ||
           isInIframe
         ) {
           console.log("[SignIn Redirection] Encountered popup blockage or sandboxed iframe bounds. Triggering Redirect Auth fallback...");
