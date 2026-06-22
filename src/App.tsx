@@ -138,38 +138,55 @@ export default function App() {
   // State for beautiful signup/signin modal prompt on button click
   const [actionPendingAuth, setActionPendingAuth] = useState<(() => void | Promise<void>) | null>(null);
 
-  // Secure interactive Google authentication sign-in
+  // Secure interactive Google authentication sign-in (synchronous at invocation to bypass popup blocker / about:blank)
   const handleSignIn = async (): Promise<any> => {
-    setIsLoadingAuth(true);
-    try {
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      // Sophisticated detection of sandboxed iframes (protects AI Studio workspace execution)
-      const isInIframe = (() => {
-        try {
-          return window.self !== window.top;
-        } catch (e) {
-          return true;
-        }
-      })();
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Sophisticated detection of sandboxed iframes (protects AI Studio workspace execution)
+    const isInIframe = (() => {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return true;
+      }
+    })();
 
-      if (isMobile && !isInIframe) {
-        // Safe fallback action persistence
-        if (actionPendingAuth) {
-          localStorage.setItem('pending_auth_action', 'booking');
-        }
+    if (isMobile && !isInIframe) {
+      setIsLoadingAuth(true);
+      // Safe fallback action persistence
+      if (actionPendingAuth) {
+        localStorage.setItem('pending_auth_action', 'booking');
+      }
+      try {
         await signInWithRedirect(auth, googleProvider);
-        return; // Mobile starts browser-level redirect navigation
-      } else {
+      } catch (err) {
+        console.error("Redirect Sign-In Error:", err);
+        setIsLoadingAuth(false);
+      }
+      return;
+    } else {
+      // Trigger signInWithPopup synchronously within the current click event frame to guarantee no browser blocks
+      try {
         const result = await signInWithPopup(auth, googleProvider);
+        setIsLoadingAuth(true);
         const user = result.user;
         await updateOrCreateUserProfile(user);
         await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Sign-In");
+        setIsLoadingAuth(false);
         return user;
+      } catch (err: any) {
+        console.error("Authentication Error:", err);
+        setIsLoadingAuth(false);
+        // Fallback to redirect inside iframe or if blocked
+        if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request' || err.code === 'auth/iframe-start-failed') {
+          console.log("Popup blocked/failed, attempting redirect...");
+          try {
+            await signInWithRedirect(auth, googleProvider);
+          } catch (redirectErr) {
+            console.error("Redirect Fallback Error:", redirectErr);
+          }
+        }
       }
-    } catch (err) {
-      console.error("Authentication Error:", err);
-      setIsLoadingAuth(false);
     }
   };
 
