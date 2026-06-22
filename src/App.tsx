@@ -3,7 +3,7 @@ import {
   Building2, Phone, MessageSquare, MapPin, Map, Share2, 
   HelpCircle, Send, Star, ExternalLink, ShieldCheck, Heart, Sparkles, Navigation, Globe, Plane,
   ShoppingBag, Trash2, Plus, Minus, X, ChevronUp, ChevronDown, UtensilsCrossed,
-  Calendar, Users, Clock, CheckCircle2
+  Calendar, Users, Clock, CheckCircle2, LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -12,7 +12,8 @@ import { MenuItem, Booking, GalleryItem, Inquiry, UserProfile, ActivityLog } fro
 
 // Import Firestore database sync and Auth support
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './firebase';
+import { db, auth, googleProvider, handleFirestoreError, OperationType } from './firebase';
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 
 // Import Seed Data
 import { 
@@ -42,6 +43,267 @@ const DISH_URL = 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?a
 
 export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(false);
+
+  // --- GOOGLE FIREBASE AUTHENTICATION FLOW STATE ---
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [actionPendingAuth, setActionPendingAuth] = useState<(() => void | Promise<void>) | null>(null);
+
+  // Helper: Write user activity logs to the Firestore logs collection
+  const logUserActivity = async (uid: string, displayName: string | null, email: string | null, action: string) => {
+    try {
+      console.log(`[Telemetry Log] Starting activity write to Firestore: "${action}" for uid: ${uid}`);
+      const logId = 'log-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      const logRef = doc(db, 'activityLogs', logId);
+      await setDoc(logRef, {
+        id: logId,
+        uid,
+        displayName: displayName || 'Anonymous User',
+        email: email || '',
+        action,
+        timestamp: new Date().toISOString()
+      });
+      console.log(`[Telemetry Log] Successfully logged activity with logId: ${logId}`);
+    } catch (err) {
+      console.error("[Telemetry Log Error] Failed to write user activity:", err);
+    }
+  };
+
+  // Helper: Create or update Firestore profile of active user
+  const updateOrCreateUserProfile = async (user: any) => {
+    if (!user) {
+      console.warn("[UserProfile] updateOrCreateUserProfile was called with empty/null user.");
+      return;
+    }
+    console.log(`[UserProfile] Initializing Firestore profile creation/sync for UID: ${user.uid}`);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      let createdAt = new Date().toISOString();
+      try {
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && data.createdAt) {
+            createdAt = data.createdAt;
+            console.log(`[UserProfile] User exists, preserving existing registration date: ${createdAt}`);
+          }
+        } else {
+          console.log(`[UserProfile] User not found, initializing fresh registration date.`);
+        }
+      } catch (e) {
+        console.warn("[UserProfile Warning] Non-fatal document fetch warning:", e);
+      }
+
+      const userData = {
+        uid: user.uid,
+        displayName: user.displayName || 'Anonymous Guest',
+        email: user.email || '',
+        photoURL: user.photoURL || '',
+        createdAt: createdAt,
+        lastLoginAt: new Date().toISOString(),
+        provider: 'Google'
+      };
+
+      await setDoc(userRef, userData);
+      console.log("[UserProfile] Saved user document to firestore collection successfully:", userData);
+    } catch (error) {
+      console.error("[UserProfile Error] Failed to upload profiles to Firestore:", error);
+    }
+  };
+
+  // Listen to Auth State and Google Redirect Sign-In results
+  useEffect(() => {
+    console.log("[AuthListener] Initializing getRedirectResult and onAuthStateChanged listeners...");
+    
+    const handleRedirectAndAuth = async () => {
+      console.log("[AuthListener] query getRedirectResult...");
+      try {
+        const result = await getRedirectResult(auth);
+        console.log("[AuthListener] getRedirectResult queried successfully.");
+        if (result && result.user) {
+          const user = result.user;
+          console.log(`[AuthListener] User detected standard redirect callback: ${user.email}`);
+          await updateOrCreateUserProfile(user);
+          await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Redirect");
+          
+          // Autocomplete pending action upon successful mobile redirect auth callback
+          const pendingAction = localStorage.getItem('pending_auth_action');
+          if (pendingAction === 'booking') {
+            console.log("[AuthListener] Processing pending action item: 'booking'");
+            localStorage.removeItem('pending_auth_action');
+            setTimeout(() => {
+              scrollToSection('booking');
+            }, 800);
+          }
+        }
+      } catch (err) {
+        console.error("[AuthListener Error] Redirect callback resolution failed:", err);
+      }
+    };
+    handleRedirectAndAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("[AuthListener] onAuthStateChanged fired. Event payload:", user ? {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL
+      } : "Logged Out / Null current user");
+
+      if (user) {
+        setCurrentUser(user);
+        // Silently update user profile (ensures fresh photo / name / lastLoginAt)
+        try {
+          await updateOrCreateUserProfile(user);
+        } catch (dbErr) {
+          console.error("[AuthListener Error] Silent profile synchronization failed:", dbErr);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+      setIsLoadingAuth(false);
+    });
+    return () => {
+      console.log("[AuthListener] Unsubscribing main auth listener.");
+      unsubscribe();
+    };
+  }, []);
+
+  // Secure interactive Google authentication sign-in
+  const handleSignIn = async (): Promise<any> => {
+    console.log("[SignIn] handleSignIn execution triggered by click handler.");
+    
+    if (!auth) {
+      console.error("[SignIn Error] CRITICAL ERROR: Firebase auth module is undefined!");
+      return null;
+    }
+
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Sophisticated detection of sandboxed iframes
+    const isInIframe = (() => {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return true;
+      }
+    })();
+
+    console.log("[SignIn] Browser environment parameters:", { isMobile, isInIframe, userAgent: navigator.userAgent });
+
+    if (isMobile && !isInIframe) {
+      console.log("[SignIn] Client is Mobile Top-Level window. Resorting immediately to Redirect authentications...");
+      setIsLoadingAuth(true);
+      if (actionPendingAuth) {
+        localStorage.setItem('pending_auth_action', 'booking');
+      }
+      try {
+        await signInWithRedirect(auth, googleProvider);
+        console.log("[SignIn] Redirect call successfully initialized.");
+      } catch (err) {
+        console.error("[SignIn Error] Direct Redirect initialization failed:", err);
+        setIsLoadingAuth(false);
+      }
+      return;
+    } else {
+      console.log("[SignIn] Client is Desktop or operating inside an iframe. Initializing signInWithPopup...");
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        setIsLoadingAuth(true);
+        const user = result.user;
+        console.log("[SignIn] Popup succeeded! Authenticated User info:", {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL
+        });
+        
+        try {
+          await updateOrCreateUserProfile(user);
+          await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Sign-In");
+        } catch (dbErr) {
+          console.error("[SignIn Error] Log/profile writes had non-blocking database warnings:", dbErr);
+        }
+        
+        setIsLoadingAuth(false);
+        return user;
+      } catch (err: any) {
+        console.error("[SignIn Error] signInWithPopup encountered error code:", err.code, "Full details:", err);
+        setIsLoadingAuth(false);
+        
+        // Blockers/Restrictions Fallback to Redirect configuration
+        if (
+          err.code === 'auth/popup-blocked' || 
+          err.code === 'auth/cancelled-popup-request' || 
+          err.code === 'auth/iframe-start-failed' ||
+          err.code === 'auth/popup-closed-by-user' ||
+          isInIframe
+        ) {
+          console.log("[SignIn Redirection] Encountered popup blockage or sandboxed iframe bounds. Triggering Redirect Auth fallback...");
+          try {
+            await signInWithRedirect(auth, googleProvider);
+            console.log("[SignIn Redirection] Fallback signInWithRedirect successfully launched.");
+          } catch (redirectErr) {
+            console.error("[SignIn Redirection Error] Redirect Auth Fallback failed completely:", redirectErr);
+          }
+        }
+      }
+    }
+  };
+
+  // Logout session
+  const handleSignOut = async () => {
+    console.log("[SignOut] Handler triggered.");
+    try {
+      if (auth.currentUser) {
+        console.log(`[SignOut] Writing sign out activity log for uid: ${auth.currentUser.uid}`);
+        await logUserActivity(
+          auth.currentUser.uid,
+          auth.currentUser.displayName,
+          auth.currentUser.email,
+          "Logged Out from Session"
+        );
+      }
+      await signOut(auth);
+      console.log("[SignOut] auth.signOut() succeeded. Refreshing browser window...");
+      window.location.reload();
+    } catch (err) {
+      console.error("[SignOut Error] Failed to coordinate complete session logout:", err);
+    }
+  };
+
+  // Protective Interceptor wrapper for immediate inline actions
+  const executeProtectedAction = async (action: () => void | Promise<void>) => {
+    console.log("[Protector] Received protected request execution request. Current User status:", auth.currentUser ? "Signed In" : "Signed Out");
+    if (auth.currentUser) {
+      console.log("[Protector] User authenticated. Running action instantly...");
+      await action();
+    } else {
+      console.log("[Protector] User not signed in. Opening Google sign-up modal prompts...");
+      setActionPendingAuth(() => action);
+    }
+  };
+
+  // Google sign in on modal sign-up click
+  const handleAuthModalSignIn = async () => {
+    console.log("[ModalSignIn] Google sign-up click registered from within the interactive prompt.");
+    try {
+      const user = await handleSignIn();
+      console.log("[ModalSignIn] handleSignIn finished, response:", user ? `UID: ${user.uid}` : "Undefined/Null");
+      if (user) {
+        const pending = actionPendingAuth;
+        setActionPendingAuth(null);
+        if (pending) {
+          console.log("[ModalSignIn] Fulfilling stored pending action block safely...");
+          setTimeout(async () => {
+            await pending();
+          }, 300);
+        }
+      }
+    } catch (err) {
+      console.error("[ModalSignIn Error] Authentication modal trigger failed:", err);
+    }
+  };
   
   // --- CORE STATE PERSISTENCE CLIENT-SIDE ENGINE ---
   const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
@@ -349,7 +611,7 @@ export default function App() {
       id: 'rev-' + Date.now(),
       ...newReview,
       date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-      avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&q=80&w=150`
+      avatar: currentUser?.photoURL || `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&q=80&w=150`
     };
     try {
       await setDoc(doc(db, 'reviews', created.id), created);
@@ -505,6 +767,9 @@ export default function App() {
         onNavClick={scrollToSection} 
         onAdminToggle={() => setIsAdminMode(!isAdminMode)}
         isAdminMode={isAdminMode}
+        currentUser={currentUser}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
       />
 
        {/* 3. CONDITIONAL RENDER: BACK-OF-HOUSE ADMIN CONSOLE vs. FRONT-OF-HOUSE PUBLIC PORTAL */}
@@ -526,6 +791,8 @@ export default function App() {
               setGalleryItems={setGalleryItems}
               inquiries={inquiries}
               setInquiries={setInquiries}
+              currentUser={currentUser}
+              onSignIn={handleSignIn}
             />
           </motion.div>
         ) : (
@@ -915,13 +1182,13 @@ export default function App() {
 
             {/* GUEST TESTIMONIAL STAR DIRECTORY */}
             <Reviews 
-              onAddReview={(rev) => handleAddReview(rev)}
+              onAddReview={(rev) => executeProtectedAction(() => handleAddReview(rev))}
               reviewsList={reviewsList}
             />
 
             {/* INTERACTIVE TABLE ACCORDION RESERVATION */}
             <BookingSystem 
-              onAddBooking={(bk) => handleAddBooking(bk)} 
+              onAddBooking={(bk) => executeProtectedAction(() => handleAddBooking(bk))} 
               selectedDishes={selectedDishesForBooking.map(item => `${item.name} (x${item.quantity})`)}
               bookings={bookings}
             />
@@ -1412,7 +1679,7 @@ export default function App() {
 
               {!preOrderSuccess ? (
                 /* Preorder details input form */
-                <form onSubmit={(e) => { e.preventDefault(); handlePreOrderFormSubmit(e); }} className="space-y-5">
+                <form onSubmit={(e) => { e.preventDefault(); executeProtectedAction(() => handlePreOrderFormSubmit(e)); }} className="space-y-5">
                   <div className="text-center space-y-1">
                     <span className="text-[9px] font-mono text-gold uppercase tracking-[0.25em] block">Saffron Dining Experience</span>
                     <h3 className="font-serif text-white text-xl uppercase font-black tracking-widest text-center">
@@ -1653,6 +1920,69 @@ export default function App() {
           <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.84 0c3.15 0 6.112 1.233 8.339 3.468C22.406 5.703 23.63 8.673 23.627 11.84c-.004 6.517-5.33 11.843-11.843 11.843-2.004-.001-3.978-.515-5.734-1.498L0 24zm4.996-3.882c1.652.981 3.272 1.498 4.998 1.499 5.485 0 9.948-4.469 10.001-9.95.025-2.656-.993-5.153-2.868-7.03C15.31 2.76 12.82 1.745 10.157 1.745c-5.484 0-9.948 4.47-10.001 9.95-.001 1.832.502 3.618 1.448 5.161L.608 22.45l5.808-1.52c-1.12.721-2.012 1.1-2.363 1.189z" />
         </svg>
       </a>
+
+      {/* 11. RE-ESTABLISHED AUTHENTICATION OVERLAY PROMPT DIALOG */}
+      <AnimatePresence>
+        {actionPendingAuth && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 30 }}
+              className="bg-[#0f0f0f] text-white border border-gold/45 p-6 md:p-8 rounded-3xl max-w-sm w-full text-center space-y-6 shadow-[0_0_60px_rgba(212,175,55,0.30)] relative overflow-hidden"
+            >
+              {/* Elegant golden strip */}
+              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-gold to-transparent" />
+              
+              {/* Close Button top right */}
+              <button
+                onClick={() => setActionPendingAuth(null)}
+                className="absolute top-4 right-4 text-white/50 hover:text-gold transition-colors p-1 cursor-pointer"
+                title="Cancel action"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="w-16 h-16 mx-auto rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center relative">
+                <div className="absolute inset-0 rounded-full border border-gold/10 animate-ping opacity-30 pointer-events-none" />
+                <ShieldCheck className="w-7 h-7 text-gold" />
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-[9px] font-mono text-gold uppercase tracking-[0.25em] block">Guest Integrity Desk</span>
+                <h3 className="font-serif text-white text-base md:text-lg uppercase font-black tracking-wider leading-relaxed">
+                  Authentication Required
+                </h3>
+                <p className="text-white/60 text-xs leading-relaxed font-sans max-w-xs mx-auto">
+                  Please authenticate with your secure Google Account to complete your reservation or review submission at Shubham Luxury Dining.
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={handleAuthModalSignIn}
+                  className="w-full py-3.5 bg-gold hover:bg-gold/90 text-black rounded-full font-serif font-black text-xs tracking-widest uppercase transition-all duration-300 shadow-[0_4px_20px_rgba(212,175,55,0.2)] cursor-pointer hover:scale-[1.02] active:scale-98 flex items-center justify-center gap-2"
+                >
+                  <LogIn className="w-4 h-4 text-black" />
+                  Sign In with Google
+                </button>
+              </div>
+
+              <button
+                onClick={() => setActionPendingAuth(null)}
+                className="text-[9px] tracking-[0.2em] text-white/40 uppercase hover:text-white transition-colors duration-200 font-bold font-mono cursor-pointer"
+              >
+                Go back to browsing
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
 
 

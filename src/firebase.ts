@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 console.log('[Firebase Init] Loading configuration JSON values:', JSON.stringify({
@@ -35,8 +36,11 @@ try {
 }
 
 export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || '(default)');
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-console.log('[Firebase Init] Firestore initialized successfully.');
+console.log('[Firebase Init] Firestore and Auth initialized successfully.');
 
 
 export enum OperationType {

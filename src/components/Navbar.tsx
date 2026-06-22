@@ -6,12 +6,18 @@ interface NavbarProps {
   onNavClick: (sectionId: string) => void;
   onAdminToggle: () => void;
   isAdminMode: boolean;
+  currentUser: any;
+  onSignIn: () => void;
+  onSignOut: () => void;
 }
 
 export default function Navbar({ 
   onNavClick, 
   onAdminToggle, 
-  isAdminMode 
+  isAdminMode,
+  currentUser,
+  onSignIn,
+  onSignOut
 }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -83,6 +89,39 @@ export default function Navbar({
             >
               Book Royal Table
             </button>
+
+            {/* Google Authentication Frame */}
+            {currentUser ? (
+              <div className="flex items-center gap-3 border-l border-white/10 pl-4">
+                {currentUser.photoURL ? (
+                  <img 
+                    src={currentUser.photoURL} 
+                    alt={currentUser.displayName || "User"} 
+                    className="w-8 h-8 rounded-full border border-gold/30 object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full border border-gold/30 bg-gold/10 flex items-center justify-center text-xs text-gold font-mono font-bold uppercase">
+                    {currentUser.displayName ? currentUser.displayName.slice(0, 2) : 'U'}
+                  </div>
+                )}
+                <button
+                  onClick={onSignOut}
+                  className="px-2.5 py-1 rounded-full border border-white/10 hover:border-red-500/30 hover:bg-red-500/5 text-white/60 hover:text-red-400 text-[10px] uppercase font-mono tracking-wider transition-all cursor-pointer"
+                  title="Sign Out"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onSignIn}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 hover:border-gold/30 bg-white/5 hover:bg-gold/10 text-white/80 hover:text-gold text-[10px] font-semibold tracking-wider transition-all duration-300 uppercase cursor-pointer"
+              >
+                <LogIn className="w-3 h-3" />
+                Sign In
+              </button>
+            )}
           </div>
 
           {/* Mobile Right Bar buttons */}
@@ -143,6 +182,40 @@ export default function Navbar({
               </div>
 
               <div className="space-y-4">
+                {currentUser ? (
+                  <div className="flex items-center gap-3 border-b border-white/5 pb-4 mb-2">
+                    {currentUser.photoURL ? (
+                      <img 
+                        src={currentUser.photoURL} 
+                        alt={currentUser.displayName || "User"} 
+                        className="w-10 h-10 rounded-full border border-gold/30 object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full border border-gold/30 bg-gold/10 flex items-center justify-center text-sm text-gold font-mono font-bold uppercase animate-pulse">
+                        {currentUser.displayName ? currentUser.displayName.slice(0, 2) : 'RG'}
+                      </div>
+                    )}
+                    <div className="text-left overflow-hidden">
+                      <div className="text-xs text-white font-medium truncate max-w-[150px]">{currentUser.displayName || 'Royal Guest'}</div>
+                      <button
+                        onClick={() => { setIsOpen(false); onSignOut(); }}
+                        className="text-[10px] text-red-400 hover:text-red-500 uppercase font-mono tracking-wider"
+                      >
+                        Secure Logout
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setIsOpen(false); onSignIn(); }}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-white/10 hover:border-gold/30 bg-white/5 hover:bg-gold/10 text-white font-bold tracking-widest text-[11px] uppercase cursor-pointer"
+                  >
+                    <LogIn className="w-4 h-4 text-gold" />
+                    Sign In with Google
+                  </button>
+                )}
+
                 <button
                   onClick={() => handleLinkClick('booking')}
                   className="w-full text-center px-6 py-3 rounded-full border border-gold bg-gold text-black transition-all duration-300 text-xs font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(212,175,55,0.2)] cursor-pointer"
