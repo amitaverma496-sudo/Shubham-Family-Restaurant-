@@ -13,7 +13,7 @@ import { MenuItem, Booking, GalleryItem, Inquiry, UserProfile, ActivityLog } fro
 // Import Firestore database sync and Auth support
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db, auth, googleProvider, handleFirestoreError, OperationType } from './firebase';
-import { onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 
 // Import Seed Data
 import { 
@@ -106,6 +106,15 @@ export default function App() {
           const user = result.user;
           await updateOrCreateUserProfile(user);
           await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Redirect");
+          
+          // Autocomplete pending action upon successful mobile redirect auth callback
+          const pendingAction = localStorage.getItem('pending_auth_action');
+          if (pendingAction === 'booking') {
+            localStorage.removeItem('pending_auth_action');
+            setTimeout(() => {
+              scrollToSection('booking');
+            }, 800);
+          }
         }
       } catch (err) {
         console.error("Redirect Authentication Error:", err);
@@ -133,7 +142,21 @@ export default function App() {
   const handleSignIn = async (): Promise<any> => {
     setIsLoadingAuth(true);
     try {
-      await signInWithRedirect(auth, googleProvider);
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        // Safe fallback action persistence
+        if (actionPendingAuth) {
+          localStorage.setItem('pending_auth_action', 'booking');
+        }
+        await signInWithRedirect(auth, googleProvider);
+        return; // Mobile starts browser-level redirect navigation
+      } else {
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
+        await updateOrCreateUserProfile(user);
+        await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Sign-In");
+        return user;
+      }
     } catch (err) {
       console.error("Authentication Error:", err);
       setIsLoadingAuth(false);
