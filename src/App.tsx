@@ -143,7 +143,17 @@ export default function App() {
     setIsLoadingAuth(true);
     try {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      if (isMobile) {
+      
+      // Sophisticated detection of sandboxed iframes (protects AI Studio workspace execution)
+      const isInIframe = (() => {
+        try {
+          return window.self !== window.top;
+        } catch (e) {
+          return true;
+        }
+      })();
+
+      if (isMobile && !isInIframe) {
         // Safe fallback action persistence
         if (actionPendingAuth) {
           localStorage.setItem('pending_auth_action', 'booking');
