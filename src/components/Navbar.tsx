@@ -162,7 +162,7 @@ export default function Navbar({
 
             {/* Direct Booking CTA */}
             <button
-              onClick={() => handleLinkClick('booking')}
+              onClick={() => currentUser ? handleLinkClick('booking') : onSignIn()}
               className="px-5 py-2 rounded-full border border-gold hover:bg-gold hover:text-black bg-gold/10 transition-all duration-300 text-xs font-semibold tracking-wider text-gold shadow-[0_0_20px_rgba(212,175,55,0.1)] hover:shadow-[0_0_25px_rgba(212,175,55,0.3)] cursor-pointer uppercase"
             >
               Book Royal Table
@@ -297,7 +297,14 @@ export default function Navbar({
                 )}
 
                 <button
-                  onClick={() => handleLinkClick('booking')}
+                  onClick={() => {
+                    if (currentUser) {
+                      handleLinkClick('booking');
+                    } else {
+                      setIsOpen(false);
+                      onSignIn();
+                    }
+                  }}
                   className="w-full text-center px-6 py-3 rounded-full border border-gold bg-gold text-black transition-all duration-300 text-xs font-bold tracking-widest uppercase shadow-[0_0_20px_rgba(212,175,55,0.2)] cursor-pointer"
                 >
                   Book Royal Table

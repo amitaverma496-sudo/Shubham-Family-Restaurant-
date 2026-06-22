@@ -112,6 +112,9 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // State for beautiful signup/signin modal prompt on button click
+  const [actionPendingAuth, setActionPendingAuth] = useState<(() => void | Promise<void>) | null>(null);
+
   // Secure interactive Google authentication sign-in
   const handleSignIn = async (): Promise<any> => {
     setIsLoadingAuth(true);
@@ -140,6 +143,8 @@ export default function App() {
         );
       }
       await signOut(auth);
+      // Ensure the browser performs a clean hard-reload so the interface resets and the login prompt re-appears
+      window.location.reload();
     } catch (err) {
       console.error("Logout Error:", err);
     }
@@ -150,17 +155,25 @@ export default function App() {
     if (auth.currentUser) {
       await action();
     } else {
-      try {
-        const user = await handleSignIn();
-        if (user) {
-          // Pause slightly to allow Google sign-in state to propagate fully before continuing
+      setActionPendingAuth(() => action);
+    }
+  };
+
+  // Google sign in on modal sign-up click
+  const handleAuthModalSignIn = async () => {
+    try {
+      const user = await handleSignIn();
+      if (user) {
+        const pending = actionPendingAuth;
+        setActionPendingAuth(null);
+        if (pending) {
           setTimeout(async () => {
-            await action();
+            await pending();
           }, 300);
         }
-      } catch (err) {
-        console.error("Interrupted protected action due to cancellation or sign-in issue:", err);
       }
+    } catch (err) {
+      console.error("Auth Modal Sign In failed:", err);
     }
   };
 
@@ -516,16 +529,18 @@ export default function App() {
 
   // Add/remove/update gastronomy dish item for booking requests with quantity
   const handleAddDishToBookingRequest = (dishName: string) => {
-    setSelectedDishesForBooking(prev => {
-      const exists = prev.some(item => item.name === dishName);
-      if (exists) {
-        // If it already exists, clicking again acts as a toggle to REMOVE (as requested)
-        return prev.filter(item => item.name !== dishName);
-      } else {
-        // If it doesn't exist, open our beautiful portion picker modal
-        setShowQuantityModalFor(dishName);
-        return prev;
-      }
+    executeProtectedAction(() => {
+      setSelectedDishesForBooking(prev => {
+        const exists = prev.some(item => item.name === dishName);
+        if (exists) {
+          // If it already exists, clicking again acts as a toggle to REMOVE (as requested)
+          return prev.filter(item => item.name !== dishName);
+        } else {
+          // If it doesn't exist, open our beautiful portion picker modal
+          setShowQuantityModalFor(dishName);
+          return prev;
+        }
+      });
     });
   };
 
@@ -822,7 +837,7 @@ export default function App() {
                 >
                   <LiquidButton
                     variant="primary"
-                    onClick={() => scrollToSection('booking')}
+                    onClick={() => executeProtectedAction(() => scrollToSection('booking'))}
                   >
                     Book Royal Table
                   </LiquidButton>
@@ -1781,6 +1796,60 @@ export default function App() {
           <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.84 0c3.15 0 6.112 1.233 8.339 3.468C22.406 5.703 23.63 8.673 23.627 11.84c-.004 6.517-5.33 11.843-11.843 11.843-2.004-.001-3.978-.515-5.734-1.498L0 24zm4.996-3.882c1.652.981 3.272 1.498 4.998 1.499 5.485 0 9.948-4.469 10.001-9.95.025-2.656-.993-5.153-2.868-7.03C15.31 2.76 12.82 1.745 10.157 1.745c-5.484 0-9.948 4.47-10.001 9.95-.001 1.832.502 3.618 1.448 5.161L.608 22.45l5.808-1.52c-1.12.721-2.012 1.1-2.363 1.189z" />
         </svg>
       </a>
+
+      {/* 8. MAJESTIC SIGNUP / SIGNIN PROMPT MODAL */}
+      <AnimatePresence>
+        {actionPendingAuth && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setActionPendingAuth(null)}
+              className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md glass p-8 sm:p-10 rounded-3xl border border-gold/20 shadow-[0_0_50px_rgba(212,175,55,0.08)] text-center overflow-hidden z-10"
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-gold/[0.02] to-transparent pointer-events-none" />
+              
+              <div className="w-16 h-16 mx-auto rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center mb-6 relative">
+                <div className="absolute inset-0 rounded-full border border-gold/10 animate-ping opacity-30" />
+                <Sparkles className="w-7 h-7 text-gold animate-pulse" />
+              </div>
+
+              <h3 className="font-serif text-xl sm:text-2xl text-white tracking-widest uppercase mb-3 gold-glow">
+                Royal Guest
+              </h3>
+              <p className="text-white/60 text-xs sm:text-xs tracking-wider uppercase mb-8 leading-relaxed max-w-xs mx-auto">
+                Explore the sublime back-of-house tracking, pre-orders, and table reservations. Sign up or sign in to register your luxury guest profile.
+              </p>
+
+              <div className="space-y-4">
+                <button
+                  onClick={handleAuthModalSignIn}
+                  className="w-full py-4 rounded-full bg-gold hover:bg-gold/90 text-black text-xs font-black tracking-widest uppercase transition-all duration-300 shadow-[0_4px_25px_rgba(212,175,55,0.2)] active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M12.24 10.285V13.4h6.887C18.2 15.614 15.645 18 12.24 18c-3.86 0-7-3.14-7-7s3.14-7 7-7c1.7 0 3.3.65 4.5 1.8l2.4-2.4C17.3 1.7 14.9 1 12.24 1c-5.523 0-10 4.477-10 10s4.477 10 10 10c5.795 0 10-4.074 10-10 0-.68-.063-1.315-.173-1.715H12.24z"/>
+                  </svg>
+                  Sign Up with Google
+                </button>
+
+                <button
+                  onClick={() => setActionPendingAuth(null)}
+                  className="w-full py-3.5 rounded-full border border-white/10 hover:bg-white/5 text-white/50 hover:text-white text-[11px] font-bold tracking-widest uppercase transition-all cursor-pointer"
+                >
+                  Cancel & Browse
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
