@@ -615,7 +615,7 @@ export default function App() {
       id: 'rev-' + Date.now(),
       ...newReview,
       date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-      avatar: currentUser?.photoURL || `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&q=80&w=150`
+      avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&q=80&w=150`
     };
     try {
       await setDoc(doc(db, 'reviews', created.id), created);
@@ -1925,6 +1925,10 @@ export default function App() {
         </svg>
       </a>
 
+
+
+
+
       {/* 11. RE-ESTABLISHED AUTHENTICATION OVERLAY PROMPT DIALOG */}
       <AnimatePresence>
         {actionPendingAuth && (
@@ -1987,8 +1991,6 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-
-
 
     </div>
   );

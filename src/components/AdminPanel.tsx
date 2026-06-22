@@ -19,7 +19,7 @@ interface AdminPanelProps {
   inquiries: Inquiry[];
   setInquiries: React.Dispatch<React.SetStateAction<Inquiry[]>>;
   currentUser: any;
-  onSignIn: () => Promise<any>;
+  onSignIn: () => void;
 }
 
 type TabType = 'table_bookings' | 'preorders' | 'menu' | 'gallery' | 'inquiries' | 'users' | 'activity_logs';
