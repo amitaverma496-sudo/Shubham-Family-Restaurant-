@@ -3,6 +3,13 @@ import { getFirestore } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
+console.log('[Firebase Init] Loading configuration JSON values:', JSON.stringify({
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain,
+  firestoreDatabaseId: (firebaseConfig as any).firestoreDatabaseId,
+  hasApiKey: !!firebaseConfig.apiKey,
+}));
+
 const config = {
   apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey,
   authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig.authDomain,
@@ -12,12 +19,29 @@ const config = {
   appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || firebaseConfig.appId,
 };
 
-const app = initializeApp(config);
+console.log('[Firebase Init] Computed config params:', {
+  projectId: config.projectId,
+  authDomain: config.authDomain,
+  hasApiKey: !!config.apiKey,
+  apiKeyLength: config.apiKey ? config.apiKey.length : 0,
+});
+
+let app;
+try {
+  app = initializeApp(config);
+  console.log('[Firebase Init] Firebase App successfully initialized.');
+} catch (error) {
+  console.error('[Firebase Init] CRITICAL Firebase initialization error:', error);
+  throw error;
+}
 
 export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || '(default)');
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+console.log('[Firebase Init] Auth & Firestore initialized successfully.');
+
 
 export enum OperationType {
   CREATE = 'create',

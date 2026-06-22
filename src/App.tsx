@@ -49,6 +49,7 @@ export default function App() {
   // Helper: Write user activity logs to the Firestore logs collection
   const logUserActivity = async (uid: string, displayName: string | null, email: string | null, action: string) => {
     try {
+      console.log(`[Telemetry Log] Starting activity write to Firestore: "${action}" for uid: ${uid}`);
       const logId = 'log-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
       const logRef = doc(db, 'activityLogs', logId);
       await setDoc(logRef, {
@@ -59,13 +60,19 @@ export default function App() {
         action,
         timestamp: new Date().toISOString()
       });
+      console.log(`[Telemetry Log] Successfully logged activity with logId: ${logId}`);
     } catch (err) {
-      console.error("Failed to write to activityLogs collection:", err);
+      console.error("[Telemetry Log Error] Failed to write user activity:", err);
     }
   };
 
   // Helper: Create or update Firestore profile of active user
   const updateOrCreateUserProfile = async (user: any) => {
+    if (!user) {
+      console.warn("[Telemetry UserProfile] updateOrCreateUserProfile was called with empty/null user.");
+      return;
+    }
+    console.log(`[Telemetry UserProfile] Initializing Firestore profile creation/sync for UID: ${user.uid}`);
     try {
       const userRef = doc(db, 'users', user.uid);
       let createdAt = new Date().toISOString();
@@ -75,10 +82,13 @@ export default function App() {
           const data = docSnap.data();
           if (data && data.createdAt) {
             createdAt = data.createdAt;
+            console.log(`[Telemetry UserProfile] User exists, preserving existing registration date: ${createdAt}`);
           }
+        } else {
+          console.log(`[Telemetry UserProfile] User not found, initializing fresh registration date.`);
         }
       } catch (e) {
-        console.warn("Could not retrieve existing user to read createdAt", e);
+        console.warn("[Telemetry UserProfile Warning] Non-fatal document fetch warning:", e);
       }
 
       const userData = {
@@ -92,24 +102,31 @@ export default function App() {
       };
 
       await setDoc(userRef, userData);
+      console.log("[Telemetry UserProfile] Saved user document to firestore collection successfully:", userData);
     } catch (error) {
-      console.error("Error creating/updating user profile in Firestore:", error);
+      console.error("[Telemetry UserProfile Error] Failed to upload profiles to Firestore:", error);
     }
   };
 
   // Listen to Auth State and Google Redirect Sign-In results
   useEffect(() => {
+    console.log("[Telemetry AuthListener] Initializing getRedirectResult and onAuthStateChanged listeners...");
+    
     const handleRedirectAndAuth = async () => {
+      console.log("[Telemetry AuthListener] query getRedirectResult...");
       try {
         const result = await getRedirectResult(auth);
+        console.log("[Telemetry AuthListener] getRedirectResult queried successfully. Details:", result ? `User UID: ${result.user?.uid}` : "No redirect result detected.");
         if (result && result.user) {
           const user = result.user;
+          console.log(`[Telemetry AuthListener] User detected standard redirect callback: ${user.email}`);
           await updateOrCreateUserProfile(user);
           await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Redirect");
           
           // Autocomplete pending action upon successful mobile redirect auth callback
           const pendingAction = localStorage.getItem('pending_auth_action');
           if (pendingAction === 'booking') {
+            console.log("[Telemetry AuthListener] Processing pending action item: 'booking'");
             localStorage.removeItem('pending_auth_action');
             setTimeout(() => {
               scrollToSection('booking');
@@ -117,22 +134,36 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.error("Redirect Authentication Error:", err);
+        console.error("[Telemetry AuthListener Error] Redirect callback resolution failed:", err);
       }
     };
     handleRedirectAndAuth();
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("[Telemetry AuthListener] onAuthStateChanged fired. Event payload:", user ? {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL
+      } : "Logged Out / Null current user");
+
       if (user) {
         setCurrentUser(user);
         // Silently update user profile (ensures fresh photo / name / lastLoginAt)
-        await updateOrCreateUserProfile(user);
+        try {
+          await updateOrCreateUserProfile(user);
+        } catch (dbErr) {
+          console.error("[Telemetry AuthListener Error] Silent profile synchronization failed:", dbErr);
+        }
       } else {
         setCurrentUser(null);
       }
       setIsLoadingAuth(false);
     });
-    return () => unsubscribe();
+    return () => {
+      console.log("[Telemetry AuthListener] Unsubscribing main auth listener.");
+      unsubscribe();
+    };
   }, []);
 
   // State for beautiful signup/signin modal prompt on button click
@@ -140,6 +171,13 @@ export default function App() {
 
   // Secure interactive Google authentication sign-in (synchronous at invocation to bypass popup blocker / about:blank)
   const handleSignIn = async (): Promise<any> => {
+    console.log("[Telemetry SignIn] handleSignIn execution triggered by click handler.");
+    
+    if (!auth) {
+      console.error("[Telemetry SignIn Error] CRITICAL ERROR: Firebase auth module is undefined!");
+      return null;
+    }
+
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     // Sophisticated detection of sandboxed iframes (protects AI Studio workspace execution)
@@ -151,39 +189,62 @@ export default function App() {
       }
     })();
 
+    console.log("[Telemetry SignIn] Browser environment parameters:", { isMobile, isInIframe, userAgent: navigator.userAgent });
+
     if (isMobile && !isInIframe) {
+      console.log("[Telemetry SignIn] Client is Mobile Top-Level window. Resorting immediately to Redirect authentications...");
       setIsLoadingAuth(true);
-      // Safe fallback action persistence
       if (actionPendingAuth) {
         localStorage.setItem('pending_auth_action', 'booking');
       }
       try {
         await signInWithRedirect(auth, googleProvider);
+        console.log("[Telemetry SignIn] Redirect call successfully initialized.");
       } catch (err) {
-        console.error("Redirect Sign-In Error:", err);
+        console.error("[Telemetry SignIn Error] Direct Redirect initialization failed:", err);
         setIsLoadingAuth(false);
       }
       return;
     } else {
-      // Trigger signInWithPopup synchronously within the current click event frame to guarantee no browser blocks
+      console.log("[Telemetry SignIn] Client is Desktop or operating inside an iframe. Initializing signInWithPopup...");
       try {
         const result = await signInWithPopup(auth, googleProvider);
         setIsLoadingAuth(true);
         const user = result.user;
-        await updateOrCreateUserProfile(user);
-        await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Sign-In");
+        console.log("[Telemetry SignIn] Popup succeeded! Authenticated User info:", {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL
+        });
+        
+        try {
+          await updateOrCreateUserProfile(user);
+          await logUserActivity(user.uid, user.displayName, user.email, "Logged In via Google Sign-In");
+        } catch (dbErr) {
+          console.error("[Telemetry SignIn Warning] Log/profile writes had non-blocking database warnings:", dbErr);
+        }
+        
         setIsLoadingAuth(false);
         return user;
       } catch (err: any) {
-        console.error("Authentication Error:", err);
+        console.error("[Telemetry SignIn Error] signInWithPopup encountered error code:", err.code, "Full details:", err);
         setIsLoadingAuth(false);
-        // Fallback to redirect inside iframe or if blocked
-        if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request' || err.code === 'auth/iframe-start-failed') {
-          console.log("Popup blocked/failed, attempting redirect...");
+        
+        // Blockers/Restrictions Fallback to Redirect configuration
+        if (
+          err.code === 'auth/popup-blocked' || 
+          err.code === 'auth/cancelled-popup-request' || 
+          err.code === 'auth/iframe-start-failed' ||
+          err.code === 'auth/popup-closed-by-user' ||
+          isInIframe
+        ) {
+          console.log("[Telemetry SignIn Redirection] Encountered popup blockage or sandboxed iframe bounds. Triggering Redirect Auth fallback...");
           try {
             await signInWithRedirect(auth, googleProvider);
+            console.log("[Telemetry SignIn Redirection] Fallback signInWithRedirect successfully launched.");
           } catch (redirectErr) {
-            console.error("Redirect Fallback Error:", redirectErr);
+            console.error("[Telemetry SignIn Redirection Error] Redirect Auth Fallback failed completely:", redirectErr);
           }
         }
       }
@@ -192,8 +253,10 @@ export default function App() {
 
   // Logout session
   const handleSignOut = async () => {
+    console.log("[Telemetry SignOut] Handler triggered.");
     try {
       if (auth.currentUser) {
+        console.log(`[Telemetry SignOut] Writing sign out activity log for uid: ${auth.currentUser.uid}`);
         await logUserActivity(
           auth.currentUser.uid,
           auth.currentUser.displayName,
@@ -202,37 +265,43 @@ export default function App() {
         );
       }
       await signOut(auth);
-      // Ensure the browser performs a clean hard-reload so the interface resets and the login prompt re-appears
+      console.log("[Telemetry SignOut] auth.signOut() succeeded. Refreshing browser window...");
       window.location.reload();
     } catch (err) {
-      console.error("Logout Error:", err);
+      console.error("[Telemetry SignOut Error] Failed to coordinate complete session logout:", err);
     }
   };
 
   // Protective Interceptor wrapper for immediate inline actions
   const executeProtectedAction = async (action: () => void | Promise<void>) => {
+    console.log("[Telemetry Protector] Received protected request execution request. Current User status:", auth.currentUser ? "Signed In" : "Signed Out");
     if (auth.currentUser) {
+      console.log("[Telemetry Protector] User authenticated. Running action instantly...");
       await action();
     } else {
+      console.log("[Telemetry Protector] User not signed in. Opening Google sign-up modal prompts...");
       setActionPendingAuth(() => action);
     }
   };
 
   // Google sign in on modal sign-up click
   const handleAuthModalSignIn = async () => {
+    console.log("[Telemetry ModalSignIn] Google sign-up click registered from within the interactive prompt.");
     try {
       const user = await handleSignIn();
+      console.log("[Telemetry ModalSignIn] handleSignIn finished, response:", user ? `UID: ${user.uid}` : "Undefined/Null");
       if (user) {
         const pending = actionPendingAuth;
         setActionPendingAuth(null);
         if (pending) {
+          console.log("[Telemetry ModalSignIn] Fulfilling stored pending action block safely...");
           setTimeout(async () => {
             await pending();
           }, 300);
         }
       }
     } catch (err) {
-      console.error("Auth Modal Sign In failed:", err);
+      console.error("[Telemetry ModalSignIn Error] Authentication modal trigger failed:", err);
     }
   };
 
