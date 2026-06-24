@@ -28,11 +28,22 @@ export default function LiquidButton({
 
   // Mouse coords relative to button for interactive glowing/radial reflection
   const [coords, setCoords] = useState({ x: 0, y: 0 });
+  const buttonRectRef = useRef<DOMRect | null>(null);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (buttonRef.current) {
+      buttonRectRef.current = buttonRef.current.getBoundingClientRect();
+    }
+  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!buttonRef.current) return;
+    if (!buttonRectRef.current && buttonRef.current) {
+      buttonRectRef.current = buttonRef.current.getBoundingClientRect();
+    }
+    const rect = buttonRectRef.current;
+    if (!rect) return;
 
-    const rect = buttonRef.current.getBoundingClientRect();
     const width = rect.width;
     const height = rect.height;
 
@@ -54,6 +65,7 @@ export default function LiquidButton({
 
   const handleMouseLeave = () => {
     setIsHovered(false);
+    buttonRectRef.current = null;
     x.set(0);
     y.set(0);
   };
@@ -83,7 +95,7 @@ export default function LiquidButton({
         ref={buttonRef}
         onClick={onClick}
         onMouseMove={handleMouseMove}
-        onMouseEnter={() => setIsHovered(true)}
+        onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         style={{
           x: springX,

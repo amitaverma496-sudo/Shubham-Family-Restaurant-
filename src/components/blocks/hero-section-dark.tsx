@@ -18,9 +18,14 @@ const Interactive3DText: React.FC<Interactive3DTextProps> = ({ regularText, grad
   const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [18, -18]), springConfig);
   const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-18, 18]), springConfig);
   
+  const containerRectRef = React.useRef<DOMRect | null>(null);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
+    if (!containerRectRef.current && containerRef.current) {
+      containerRectRef.current = containerRef.current.getBoundingClientRect();
+    }
+    const rect = containerRectRef.current;
+    if (!rect) return;
     const width = rect.width;
     const height = rect.height;
     
@@ -32,6 +37,7 @@ const Interactive3DText: React.FC<Interactive3DTextProps> = ({ regularText, grad
   };
   
   const handleMouseLeave = () => {
+    containerRectRef.current = null;
     x.set(0);
     y.set(0);
   };

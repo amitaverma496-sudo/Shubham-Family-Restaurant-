@@ -211,7 +211,8 @@ export default function NeuralBackground({
 
     // --- INITIALIZATION ---
     const init = () => {
-      const dpr = window.devicePixelRatio || 1;
+      // Limit DPR to 1.0 for standard-density rendering. This guarantees butter-smooth performance on 144Hz, 4K, and Retina screens.
+      const dpr = 1.0;
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       ctx.scale(dpr, dpr);
@@ -245,16 +246,22 @@ export default function NeuralBackground({
     };
 
     // --- EVENT LISTENERS ---
+    let canvasRect = canvas.getBoundingClientRect();
+
     const handleResize = () => {
       width = container.clientWidth;
       height = container.clientHeight;
       init();
+      canvasRect = canvas.getBoundingClientRect();
+    };
+
+    const handleScroll = () => {
+      canvasRect = canvas.getBoundingClientRect();
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      mouse.x = e.clientX - rect.left;
-      mouse.y = e.clientY - rect.top;
+      mouse.x = e.clientX - canvasRect.left;
+      mouse.y = e.clientY - canvasRect.top;
     };
 
     const handleMouseLeave = () => {
@@ -267,11 +274,13 @@ export default function NeuralBackground({
     animate();
 
     window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseleave", handleMouseLeave);
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseleave", handleMouseLeave);
       cancelAnimationFrame(animationFrameId);

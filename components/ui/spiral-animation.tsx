@@ -431,8 +431,8 @@ export const SpiralAnimation = memo(function SpiralAnimation({ color = '#D4AF37'
         const ctx = canvas.getContext('2d')
         if (!ctx) return
         
-        // 限制最大DPR为1.5或2以极大地提升渲染性能，且视觉无差别
-        const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+        // Limit DPR to 1.0 for the background canvas starfield to guarantee butter-smooth 60+ FPS on high-DPI displays.
+        const dpr = 1.0
         // 使用全屏尺寸
         const size = Math.max(dimensions.width, dimensions.height)
         

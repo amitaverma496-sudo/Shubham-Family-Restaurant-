@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Users, Calendar, NotebookTabs, Image, MailCheck, Trash2, CheckCircle2, 
   XCircle, Filter, Plus, Compass, Sparkles, Check, KeySquare, ShieldCheck,
-  Search, Edit, X, MessageSquare, Utensils, LogIn
+  Search, Edit, X, MessageSquare, Utensils
 } from 'lucide-react';
 import { Booking, MenuItem, GalleryItem, Inquiry, MenuCategory, UserProfile, ActivityLog } from '../types';
 import { motion } from 'motion/react';
@@ -18,8 +18,6 @@ interface AdminPanelProps {
   setGalleryItems: React.Dispatch<React.SetStateAction<GalleryItem[]>>;
   inquiries: Inquiry[];
   setInquiries: React.Dispatch<React.SetStateAction<Inquiry[]>>;
-  currentUser: any;
-  onSignIn: () => void;
 }
 
 type TabType = 'table_bookings' | 'preorders' | 'menu' | 'gallery' | 'inquiries' | 'users' | 'activity_logs';
@@ -28,8 +26,7 @@ export default function AdminPanel({
   bookings, setBookings,
   menuItems, setMenuItems,
   galleryItems, setGalleryItems,
-  inquiries, setInquiries,
-  currentUser, onSignIn
+  inquiries, setInquiries
 }: AdminPanelProps) {
   const [password, setPassword] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -59,12 +56,6 @@ export default function AdminPanel({
   const [dbActivityLogs, setDbActivityLogs] = useState<ActivityLog[]>([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [logSearchQuery, setLogSearchQuery] = useState('');
-
-  useEffect(() => {
-    if (currentUser && currentUser.email === 'amitaverma496@gmail.com') {
-      setIsUnlocked(true);
-    }
-  }, [currentUser]);
 
   useEffect(() => {
     if (!isUnlocked) return;
@@ -351,46 +342,6 @@ export default function AdminPanel({
             >
               Unlock Terminal
             </button>
-
-            {/* Google Identity SSO Provider */}
-            <div className="relative pt-2">
-              <div className="flex items-center my-2">
-                <div className="flex-1 border-t border-white/5"></div>
-                <span className="px-3 text-[9px] text-white/30 uppercase tracking-[0.2em] font-mono">OR</span>
-                <div className="flex-1 border-t border-white/5"></div>
-              </div>
-
-              {currentUser ? (
-                currentUser.email === 'amitaverma496@gmail.com' ? (
-                  <button
-                    onClick={() => setIsUnlocked(true)}
-                    type="button"
-                    className="w-full py-3.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[10px] font-bold tracking-widest uppercase transition-all duration-300 active:scale-98 flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(16,185,129,0.1)]"
-                  >
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    Enter with Admin Session
-                  </button>
-                ) : (
-                  <div className="text-center space-y-1 bg-red-500/5 p-3 rounded-xl border border-red-500/10">
-                    <p className="text-[9px] text-red-400 tracking-wider uppercase font-mono truncate">
-                      Signed in: {currentUser.email}
-                    </p>
-                    <p className="text-[8px] text-white/40 uppercase leading-normal">
-                      Access Denied. Use Admin Google ID or enter passkey.
-                    </p>
-                  </div>
-                )
-              ) : (
-                <button
-                  onClick={onSignIn}
-                  type="button"
-                  className="w-full py-3.5 rounded-full border border-gold/30 bg-gold/10 hover:bg-gold/20 text-gold text-[10px] font-bold tracking-widest uppercase transition-all duration-300 active:scale-98 flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(212,175,55,0.05)]"
-                >
-                  <LogIn className="w-3.5 h-3.5 text-gold animate-pulse" />
-                  Unlock with Google
-                </button>
-              )}
-            </div>
           </form>
         </motion.div>
       </div>

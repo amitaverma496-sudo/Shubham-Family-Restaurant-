@@ -37,37 +37,50 @@ const GlowCard: React.FC<GlowCardProps> = ({
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
+  const rectRef = useRef<DOMRect | null>(null);
 
   useEffect(() => {
-    let lastClientX = 0;
-    let lastClientY = 0;
-
-    const updateCoords = () => {
-      if (cardRef.current) {
-        const rect = cardRef.current.getBoundingClientRect();
-        const x = lastClientX - rect.left;
-        const y = lastClientY - rect.top;
-        cardRef.current.style.setProperty('--x', x.toFixed(2));
-        cardRef.current.style.setProperty('--xp', (x / rect.width).toFixed(2));
-        cardRef.current.style.setProperty('--y', y.toFixed(2));
-        cardRef.current.style.setProperty('--yp', (y / rect.height).toFixed(2));
-      }
+    const handleScroll = () => {
+      rectRef.current = null;
     };
-
-    const syncPointer = (e: PointerEvent) => {
-      lastClientX = e.clientX;
-      lastClientY = e.clientY;
-      updateCoords();
-    };
-
-    document.addEventListener('pointermove', syncPointer);
-    window.addEventListener('scroll', updateCoords, { passive: true });
-
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll);
     return () => {
-      document.removeEventListener('pointermove', syncPointer);
-      window.removeEventListener('scroll', updateCoords);
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
     };
   }, []);
+
+  const handlePointerEnter = () => {
+    if (cardRef.current) {
+      rectRef.current = cardRef.current.getBoundingClientRect();
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (cardRef.current) {
+      if (!rectRef.current) {
+        rectRef.current = cardRef.current.getBoundingClientRect();
+      }
+      const rect = rectRef.current;
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      cardRef.current.style.setProperty('--x', x.toFixed(2));
+      cardRef.current.style.setProperty('--xp', (x / rect.width).toFixed(2));
+      cardRef.current.style.setProperty('--y', y.toFixed(2));
+      cardRef.current.style.setProperty('--yp', (y / rect.height).toFixed(2));
+    }
+  };
+
+  const handlePointerLeave = () => {
+    rectRef.current = null;
+    if (cardRef.current) {
+      cardRef.current.style.setProperty('--x', '-1000');
+      cardRef.current.style.setProperty('--y', '-1000');
+      cardRef.current.style.setProperty('--xp', '0');
+      cardRef.current.style.setProperty('--yp', '0');
+    }
+  };
 
   const { base, spread } = glowColorMap[glowColor];
 
@@ -184,6 +197,9 @@ const GlowCard: React.FC<GlowCardProps> = ({
       <div
         ref={cardRef}
         data-glow
+        onPointerEnter={handlePointerEnter}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
         style={getInlineStyles()}
         className={`
           ${getSizeClasses()}
